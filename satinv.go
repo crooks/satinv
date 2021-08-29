@@ -86,6 +86,10 @@ func mkInventory() {
 	cache := cacher.NewCacher(cfg.CacheDIR)
 	cache.SetCacheDuration(cfg.CacheValidity)
 	cache.InitAPI(cfg.APIUser, cfg.APIPassword, cfg.APICertFile)
+	if flags.Refresh {
+		// Force a cache refresh
+		cache.SetRefresh()
+	}
 
 	// Populate the hosts object
 	hostsURL := fmt.Sprintf("%s/api/v2/hosts?per_page=1000", cfg.APIBaseURL)
