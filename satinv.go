@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/crooks/satinv/cacher"
 	"github.com/crooks/satinv/config"
@@ -26,6 +27,17 @@ type ansible struct {
 // shortName take a hostname string and returns the shortname for it.
 func shortName(host string) string {
 	return strings.Split(host, ".")[0]
+}
+
+// satTimestamp parses a DateTime string of the format used in the Satellite API
+func satTimestamp(ts string) (t time.Time, err error) {
+	layout := "2006-01-02 15:04:05 MST"
+	t, err = time.Parse(layout, ts)
+	if err != nil {
+		log.Printf("Sat time parse: %v", err)
+		return
+	}
+	return
 }
 
 // getHostByID returns the string representation of a hostname for a given ID string.
@@ -90,8 +102,9 @@ func mkInventory() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ans.parseHosts(hosts, cache)
+	ans.parseHosts(hosts)
 	ans.parseHostCollections(hosts, cache)
+	ans.satValid(hosts)
 	// For human readability, put an LF on the end of the json.
 	ans.json += "\n"
 	if flags.List {
@@ -106,7 +119,7 @@ func mkInventory() {
 	}
 }
 
-func (ans *ansible) parseHosts(hosts gjson.Result, cache *cacher.Cache) {
+func (ans *ansible) parseHosts(hosts gjson.Result) {
 	for _, h := range hosts.Get("results.#.name").Array() {
 		query := fmt.Sprintf("results.#(name=%s)", h)
 		key := fmt.Sprintf("_meta.hostvars.%s", shortName(h.String()))
@@ -151,6 +164,64 @@ func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache
 			if err != nil {
 				log.Fatal(err)
 			}
+		}
+	}
+}
+
+func (ans *ansible) satValid(hosts gjson.Result) {
+	satValidAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
+	for _, host := range hosts.Get("results").Array() {
+		h := host.Get("name")
+		if !h.Exists() {
+			log.Print("No hostname defined for API list item")
+			continue
+		}
+		hostname := shortName(h.String())
+
+		// Check the host has an IP address
+		ip4 := host.Get("ip")
+		ip6 := host.Get("ip6")
+		if !ip4.Exists() && !ip6.Exists() {
+			log.Printf("satValid: No IP address found for %s", hostname)
+			continue
+		}
+		if ip4.String() == "" && ip6.String() == "" {
+			log.Printf("satValid: No valid IP addresses found for %s", hostname)
+			continue
+		}
+		// Ensure the host has a valid subscription
+		subStatus := host.Get("subscription_status")
+		if !subStatus.Exists() || subStatus.Int() != 0 {
+			log.Printf("satValid: subscription_status not found for %s", hostname)
+			continue
+		}
+		if subStatus.Int() != 0 {
+			log.Printf("satValid: Invalid subscription status (%d) for %s", subStatus.Int(), hostname)
+			continue
+		}
+
+		// Check last_checkin date
+		checkin := host.Get("subscription_facet_attributes.last_checkin")
+		if !checkin.Exists() {
+			log.Printf("satValid: subscription_facet_attributes.last_checkin not found for %s", hostname)
+			continue
+		}
+		satTime, err := satTimestamp(checkin.String())
+		if err != nil {
+			// consider the host to be invalid
+			log.Printf("satValid: Invalid date/time %s for %s", checkin.String(), hostname)
+			continue
+		}
+		oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.SatValidDays))
+		if satTime.Before(oldestValidTime) {
+			log.Printf("satValid: Last checkin for %s is too old", hostname)
+			continue
+		}
+
+		// All the above conditions passed; this is a valid host.
+		ans.json, err = sjson.Set(ans.json, satValidAppend, hostname)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 }

@@ -14,18 +14,19 @@ type Config struct {
 	APICertFile     string `yaml:"api_certfile"`
 	APIPassword     string `yaml:"api_password"`
 	APIUser         string `yaml:"api_user"`
-	CacheDIR	string `yaml:"cache_dir"`
-	CacheValidity int64 `yaml:"cache_validity"`
+	CacheDIR        string `yaml:"cache_dir"`
+	CacheValidity   int64  `yaml:"cache_validity"`
 	InventoryPrefix string `yaml:"inventory_prefix"`
 	OutJSON         string `yaml:"target_filename"`
+	SatValidDays    int    `yaml:"sat_valid_days"`
 	SamplePath      string `yaml:"sample_path"`
 }
 
 // Flags are the command line flags
 type Flags struct {
 	Config string
-	Debug bool
-	List bool
+	Debug  bool
+	List   bool
 }
 
 // WriteConfig will create a YAML formatted config file from a Config struct
@@ -69,6 +70,10 @@ func ParseConfig(filename string) (*Config, error) {
 	config := new(Config)
 	if err := y.Decode(&config); err != nil {
 		return nil, err
+	}
+	// Default sat_valid period to one week
+	if config.SatValidDays == 0 {
+		config.SatValidDays = 7
 	}
 	return config, nil
 }
