@@ -5,7 +5,7 @@ This program will generate an [Ansible](https://ansible.com) [Dynamic Inventory]
 * Valid Hosts - In this context a host is valid if it has:
     * an IP address (ipv4 or ipv6)
     * a valid Red Hat subscription
-    * been seen within an acceptable period of time
+    * been seen within an acceptable period of time - 7 days default (config option: sat_valid_days)
 * CIDR groups - Groups created based on the subnet the host resides in
 
 ## Installation
@@ -16,7 +16,7 @@ This program will generate an [Ansible](https://ansible.com) [Dynamic Inventory]
 
 ## Configuration
 The configuration for **satinv** lives in a single YAML formatted file.  The file can be located anywhere but the default is `/etc/ansible/satinv.yml`.
-The location can be overridden with `--config=/path/to/config.yml` or by setting the environment variable `SATINVCFG`.  **Note**: You cannot use the --config option when running satinv from ansible-playbook or ansible-inventory.  This is a constraint applied by Ansible.  A basic config file could be:
+The location can be overridden with `--config=/path/to/config.yml` or by setting the environment variable `SATINVCFG`.  **Note**: You cannot use the --config option when running satinv from `ansible-playbook` or `ansible-inventory`.  This is a constraint imposed by Ansible.  A basic config file could be:
 ```
 ---
 api_baseurl: https://www.redhat.mydomain.com
