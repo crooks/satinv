@@ -108,7 +108,6 @@ func mkInventory() {
 	}
 	ans.parseHosts(hosts)
 	ans.parseHostCollections(hosts, cache)
-	ans.satValid(hosts)
 	// For human readability, put an LF on the end of the json.
 	ans.json += "\n"
 	if flags.List {
@@ -123,15 +122,34 @@ func mkInventory() {
 	}
 }
 
+// parseHosts creates the inventory hostvars metadata for each host
 func (ans *ansible) parseHosts(hosts gjson.Result) {
 	defer timeTrack(time.Now(), "parseHosts")
 	var err error
+	
+	// Initialize the sat_valid inventory group
+	// satValidAppend is a special string used by sjson to append entries to an inventory group
+	satValidAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
+	// Add sat_valid to the all{children} array
+	ans.json, err = sjson.Set(ans.json, "all.children.-1", cfg.InventoryPrefix + "valid")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Iterate through each host in the Satellite results
 	for _, h := range hosts.Get("results").Array() {
-		key := fmt.Sprintf("_meta.hostvars.%s", shortName(h.Get("name").String()))
+		// Every individual host map should contain a "name" key
+		if ! h.Get("name").Exists() {
+			log.Print("No hostname found in Satellite host map")
+			continue
+		}
+		hostNameShort := shortName(h.Get("name").String())
+		key := fmt.Sprintf("_meta.hostvars.%s", hostNameShort)
 		ans.json, err = sjson.Set(ans.json, key, h.Value())
 		if err != nil {
 			log.Fatal(err)
 		}
+		ans.hgSatValid(h, satValidAppend, hostNameShort)
 	}
 }
 
@@ -173,61 +191,52 @@ func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache
 	}
 }
 
-func (ans *ansible) satValid(hosts gjson.Result) {
-	satValidAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
-	for _, host := range hosts.Get("results").Array() {
-		h := host.Get("name")
-		if !h.Exists() {
-			log.Print("No hostname defined for API list item")
-			continue
-		}
-		hostname := shortName(h.String())
+// satValid creates an inventory group of hosts the meet "valid" conditions.
+func (ans *ansible) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
+	// Check the host has an IP address
+	ip4 := host.Get("ip")
+	ip6 := host.Get("ip6")
+	if !ip4.Exists() && !ip6.Exists() {
+		log.Printf("satValid: No IP address found for %s", hostNameShort)
+		return
+	}
+	if ip4.String() == "" && ip6.String() == "" {
+		log.Printf("satValid: No valid IP addresses found for %s", hostNameShort)
+		return
+	}
+	// Ensure the host has a valid subscription
+	subStatus := host.Get("subscription_status")
+	if !subStatus.Exists() || subStatus.Int() != 0 {
+		log.Printf("satValid: subscription_status not found for %s", hostNameShort)
+		return
+	}
+	if subStatus.Int() != 0 {
+		log.Printf("satValid: Invalid subscription status (%d) for %s", subStatus.Int(), hostNameShort)
+		return
+	}
 
-		// Check the host has an IP address
-		ip4 := host.Get("ip")
-		ip6 := host.Get("ip6")
-		if !ip4.Exists() && !ip6.Exists() {
-			log.Printf("satValid: No IP address found for %s", hostname)
-			continue
-		}
-		if ip4.String() == "" && ip6.String() == "" {
-			log.Printf("satValid: No valid IP addresses found for %s", hostname)
-			continue
-		}
-		// Ensure the host has a valid subscription
-		subStatus := host.Get("subscription_status")
-		if !subStatus.Exists() || subStatus.Int() != 0 {
-			log.Printf("satValid: subscription_status not found for %s", hostname)
-			continue
-		}
-		if subStatus.Int() != 0 {
-			log.Printf("satValid: Invalid subscription status (%d) for %s", subStatus.Int(), hostname)
-			continue
-		}
+	// Check last_checkin date
+	checkin := host.Get("subscription_facet_attributes.last_checkin")
+	if !checkin.Exists() {
+		log.Printf("satValid: subscription_facet_attributes.last_checkin not found for %s", hostNameShort)
+		return
+	}
+	satTime, err := satTimestamp(checkin.String())
+	if err != nil {
+		// consider the host to be invalid
+		log.Printf("satValid: Invalid date/time %s for %s", checkin.String(), hostNameShort)
+		return
+	}
+	oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.SatValidDays))
+	if satTime.Before(oldestValidTime) {
+		log.Printf("satValid: Last checkin for %s is too old", hostNameShort)
+		return
+	}
 
-		// Check last_checkin date
-		checkin := host.Get("subscription_facet_attributes.last_checkin")
-		if !checkin.Exists() {
-			log.Printf("satValid: subscription_facet_attributes.last_checkin not found for %s", hostname)
-			continue
-		}
-		satTime, err := satTimestamp(checkin.String())
-		if err != nil {
-			// consider the host to be invalid
-			log.Printf("satValid: Invalid date/time %s for %s", checkin.String(), hostname)
-			continue
-		}
-		oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.SatValidDays))
-		if satTime.Before(oldestValidTime) {
-			log.Printf("satValid: Last checkin for %s is too old", hostname)
-			continue
-		}
-
-		// All the above conditions passed; this is a valid host.
-		ans.json, err = sjson.Set(ans.json, satValidAppend, hostname)
-		if err != nil {
-			log.Fatal(err)
-		}
+	// All the above conditions passed; this is a valid host.
+	ans.json, err = sjson.Set(ans.json, satValidAppend, hostNameShort)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
