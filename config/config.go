@@ -20,7 +20,6 @@ type Config struct {
 	InventoryPrefix string            `yaml:"inventory_prefix"`
 	OutJSON         string            `yaml:"target_filename"`
 	SatValidDays    int               `yaml:"sat_valid_days"`
-	SamplePath      string            `yaml:"sample_path"`
 }
 
 // Flags are the command line flags
@@ -77,6 +76,18 @@ func ParseConfig(filename string) (*Config, error) {
 	// Default sat_valid period to one week
 	if config.SatValidDays == 0 {
 		config.SatValidDays = 7
+	}
+	// Set default cache validity to 8 hours
+	if config.CacheValidity == 0 {
+		config.CacheValidity = 8 * 60 * 60
+	}
+	// Set default inventory InventoryPrefix
+	if config.InventoryPrefix == "" {
+		config.InventoryPrefix = "sat_"
+	}
+	// Set default target_filename
+	if config.OutJSON == "" {
+		config.OutJSON = "/tmp/satinv.json"
 	}
 	return config, nil
 }
