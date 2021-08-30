@@ -124,11 +124,11 @@ func mkInventory() {
 }
 
 func (ans *ansible) parseHosts(hosts gjson.Result) {
-	for _, h := range hosts.Get("results.#.name").Array() {
-		query := fmt.Sprintf("results.#(name=%s)", h)
-		key := fmt.Sprintf("_meta.hostvars.%s", shortName(h.String()))
-		var err error
-		ans.json, err = sjson.Set(ans.json, key, hosts.Get(query).Value())
+	defer timeTrack(time.Now(), "parseHosts")
+	var err error
+	for _, h := range hosts.Get("results").Array() {
+		key := fmt.Sprintf("_meta.hostvars.%s", shortName(h.Get("name").String()))
+		ans.json, err = sjson.Set(ans.json, key, h.Value())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -138,6 +138,7 @@ func (ans *ansible) parseHosts(hosts gjson.Result) {
 // parseHostCollections iterates through the Satellite Host Collections and associates hostnames with the each
 // Collection's host_ids.
 func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache) {
+	defer timeTrack(time.Now(), "parseHostCollections")
 	collectionsURL := fmt.Sprintf("%s/katello/api/host_collections", cfg.APIBaseURL)
 	cache.AddURL(collectionsURL, "host_collections.json")
 	collections, err := cache.GetURL(collectionsURL)
@@ -228,6 +229,11 @@ func (ans *ansible) satValid(hosts gjson.Result) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	log.Printf("%s took %s", name, elapsed)
 }
 
 func main() {
