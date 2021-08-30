@@ -10,16 +10,17 @@ import (
 
 // Config contains all the configuration settings for Yamn.
 type Config struct {
-	APIBaseURL      string `yaml:"api_baseurl"`
-	APICertFile     string `yaml:"api_certfile"`
-	APIPassword     string `yaml:"api_password"`
-	APIUser         string `yaml:"api_user"`
-	CacheDIR        string `yaml:"cache_dir"`
-	CacheValidity   int64  `yaml:"cache_validity"`
-	InventoryPrefix string `yaml:"inventory_prefix"`
-	OutJSON         string `yaml:"target_filename"`
-	SatValidDays    int    `yaml:"sat_valid_days"`
-	SamplePath      string `yaml:"sample_path"`
+	APIBaseURL      string            `yaml:"api_baseurl"`
+	APICertFile     string            `yaml:"api_certfile"`
+	APIPassword     string            `yaml:"api_password"`
+	APIUser         string            `yaml:"api_user"`
+	CacheDIR        string            `yaml:"cache_dir"`
+	CacheValidity   int64             `yaml:"cache_validity"`
+	CIDRs           map[string]string `yaml:"cidrs"`
+	InventoryPrefix string            `yaml:"inventory_prefix"`
+	OutJSON         string            `yaml:"target_filename"`
+	SatValidDays    int               `yaml:"sat_valid_days"`
+	SamplePath      string            `yaml:"sample_path"`
 }
 
 // Flags are the command line flags

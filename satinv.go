@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/crooks/satinv/cacher"
+	"github.com/crooks/satinv/cidrs"
 	"github.com/crooks/satinv/config"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -80,6 +81,12 @@ func getHostCollection(id string, cache *cacher.Cache) (gjson.Result, error) {
 	return collection, nil
 }
 
+func importCIDRs() cidrs.Cidrs {
+	cidr := make(cidrs.Cidrs)
+	cidr.AddCIDRMap(cfg.CIDRs)
+	return cidr
+}
+
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
 func mkInventory() {
 	// Initialize the URL cache
@@ -126,12 +133,18 @@ func mkInventory() {
 func (ans *ansible) parseHosts(hosts gjson.Result) {
 	defer timeTrack(time.Now(), "parseHosts")
 	var err error
-	
+
+	// Import the CIDRs we want to test each address against.
+	cidr := importCIDRs()
+	if len(cidr) == 0 {
+		log.Print("Bypassing CIDR membership processing.  No CIDRs defined.")
+	}
+
 	// Initialize the sat_valid inventory group
 	// satValidAppend is a special string used by sjson to append entries to an inventory group
 	satValidAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
 	// Add sat_valid to the all{children} array
-	ans.json, err = sjson.Set(ans.json, "all.children.-1", cfg.InventoryPrefix + "valid")
+	ans.json, err = sjson.Set(ans.json, "all.children.-1", cfg.InventoryPrefix+"valid")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,7 +152,7 @@ func (ans *ansible) parseHosts(hosts gjson.Result) {
 	// Iterate through each host in the Satellite results
 	for _, h := range hosts.Get("results").Array() {
 		// Every individual host map should contain a "name" key
-		if ! h.Get("name").Exists() {
+		if !h.Get("name").Exists() {
 			log.Print("No hostname found in Satellite host map")
 			continue
 		}
@@ -150,6 +163,9 @@ func (ans *ansible) parseHosts(hosts gjson.Result) {
 			log.Fatal(err)
 		}
 		ans.hgSatValid(h, satValidAppend, hostNameShort)
+		if len(cidr) > 0 {
+			ans.hgCIDRMembers(h, cidr)
+		}
 	}
 }
 
@@ -240,6 +256,36 @@ func (ans *ansible) hgSatValid(host gjson.Result, satValidAppend, hostNameShort 
 	}
 }
 
+
+// hgCIDRMembers compares the IPv4 address of the current host to a list of CIDRs.  When the address is a member of a
+// CIDR, its appended to an inventory group for that CIDR.
+func (ans *ansible) hgCIDRMembers(host gjson.Result, cidr cidrs.Cidrs) {
+	hostNameShort := shortName(host.Get("name").String())
+
+	// Test the validity of the address for CIDR membership processing.
+	gjIP4 := host.Get("ip")
+	if !gjIP4.Exists() {
+		return
+	}
+	ip4 := gjIP4.String()
+	if ip4 == "" {
+		return
+	}
+
+	// invGrps will contain a slice of all inventory groups the address is a member of.
+	invGrps := cidr.ParseCIDRs(ip4)
+
+	var err error
+	for _, invGrp := range invGrps {
+		sjKey := fmt.Sprintf("%s.hosts.-1", mkInventoryName(invGrp))
+		ans.json, err = sjson.Set(ans.json, sjKey, hostNameShort)
+		if err != nil {
+			log.Printf("hgCIDRMembers: %s: %v", hostNameShort, err)
+		}
+	}
+}
+
+// timeTrack can be used to time the processing duration of a function.
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
 	log.Printf("%s took %s", name, elapsed)
