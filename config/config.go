@@ -1,3 +1,4 @@
+// config provides flag and configuration file reading for satinv
 package config
 
 import (

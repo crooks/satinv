@@ -1,3 +1,4 @@
+// cacher provides disk caching of json retrieved from APIs
 package cacher
 
 import (

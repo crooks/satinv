@@ -1,3 +1,4 @@
+// satapi provides an API interface to Red Hat Satellite
 package satapi
 
 import (

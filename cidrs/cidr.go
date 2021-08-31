@@ -1,3 +1,4 @@
+// cidrs provides a method for a testing membership of a given IPv4 address to multiple subnets.
 package cidrs
 
 import (
