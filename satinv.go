@@ -199,7 +199,7 @@ func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache
 				log.Printf("Cannot fetch host by ID: %v", err)
 				continue
 			}
-			ans.json, err = sjson.Set(ans.json, collectionAppend, host)
+			ans.json, err = sjson.Set(ans.json, collectionAppend, shortName(host))
 			if err != nil {
 				log.Fatal(err)
 			}
