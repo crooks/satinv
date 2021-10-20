@@ -90,7 +90,7 @@ func importCIDRs() cidrs.Cidrs {
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
 func mkInventory() {
 	// Initialize the URL cache
-	cache := cacher.NewCacher(cfg.CacheDIR)
+	cache := cacher.NewCacher(cfg.CacheDir)
 	cache.SetCacheDuration(cfg.CacheValidity)
 	cache.InitAPI(cfg.APIUser, cfg.APIPassword, cfg.APICertFile)
 	if flags.Refresh {
@@ -255,7 +255,6 @@ func (ans *ansible) hgSatValid(host gjson.Result, satValidAppend, hostNameShort 
 		log.Fatal(err)
 	}
 }
-
 
 // hgCIDRMembers compares the IPv4 address of the current host to a list of CIDRs.  When the address is a member of a
 // CIDR, its appended to an inventory group for that CIDR.
