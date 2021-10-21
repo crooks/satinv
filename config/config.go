@@ -17,7 +17,7 @@ type Config struct {
 	APICertFile     string            `yaml:"api_certfile"`
 	APIPassword     string            `yaml:"api_password"`
 	APIUser         string            `yaml:"api_user"`
-	CacheHomeDir    bool              `yaml:"cache_homedir"`
+	HomeDir         bool              `yaml:"use_homedir"`
 	CacheDir        string            `yaml:"cache_dir"`
 	CacheValidity   int64             `yaml:"cache_validity"`
 	CIDRs           map[string]string `yaml:"cidrs"`
@@ -99,13 +99,14 @@ func ParseConfig(filename string) (*Config, error) {
 	if config.OutJSON == "" {
 		config.OutJSON = "/tmp/satinv.json"
 	}
-	// If the CacheHomeDir boolean is true, config.CacheDir will be relative to the user's HomeDir.
-	// This overcomes issues with multiple users trying to write to a common cache.
-	if config.CacheHomeDir {
+	// If the CacheHomeDir boolean is true, other config paths will be relative to the user's HomeDir.
+	// This overcomes issues with multiple users trying to read/write to a common cache.
+	if config.HomeDir {
 		user, err := user.Current()
 		if err != nil {
 			panic(err)
 		}
+		config.OutJSON = path.Join(user.HomeDir, config.OutJSON)
 		config.CacheDir = path.Join(user.HomeDir, config.CacheDir)
 	}
 	return config, nil
