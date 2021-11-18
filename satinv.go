@@ -21,8 +21,9 @@ var (
 	flags *config.Flags
 )
 
-type ansible struct {
-	json string
+type inventory struct {
+	json  string
+	cache *cacher.Cache
 }
 
 // shortName take a hostname string and returns the shortname for it.
@@ -61,11 +62,11 @@ func mkInventoryName(s string) string {
 }
 
 // getHostCollection takes an ID string and returns the Host Collection associated with it.
-func getHostCollection(id string, cache *cacher.Cache) (gjson.Result, error) {
+func (inv *inventory) getHostCollection(id string) (gjson.Result, error) {
 	collectionURL := fmt.Sprintf("%s/katello/api/host_collections/%s", cfg.API.BaseURL, id)
 	collectionFilename := fmt.Sprintf("host_collections_%s.json", id)
-	cache.AddURL(collectionURL, collectionFilename)
-	collection, err := cache.GetURL(collectionURL)
+	inv.cache.AddURL(collectionURL, collectionFilename)
+	collection, err := inv.cache.GetURL(collectionURL)
 	if err != nil {
 		return gjson.Result{}, err
 	}
@@ -89,48 +90,49 @@ func importCIDRs() cidrs.Cidrs {
 
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
 func mkInventory() {
+	// Initialize an inventory struct
+	inv := new(inventory)
 	// Initialize the URL cache
-	cache := cacher.NewCacher(cfg.Cache.Dir)
-	cache.SetCacheDuration(cfg.Cache.Validity)
-	cache.InitAPI(cfg.API.User, cfg.API.Password, cfg.API.CertFile)
+	inv.cache = cacher.NewCacher(cfg.Cache.Dir)
+	inv.cache.SetCacheDuration(cfg.Cache.Validity)
+	inv.cache.InitAPI(cfg.API.User, cfg.API.Password, cfg.API.CertFile)
 	if flags.Refresh {
 		// Force a cache refresh
-		cache.SetRefresh()
+		inv.cache.SetRefresh()
 	}
 
 	// Populate the hosts object
 	hostsURL := fmt.Sprintf("%s/api/v2/hosts?per_page=1000", cfg.API.BaseURL)
-	cache.AddURL(hostsURL, "hosts.json")
-	hosts, err := cache.GetURL(hostsURL)
+	inv.cache.AddURL(hostsURL, "hosts.json")
+	hosts, err := inv.cache.GetURL(hostsURL)
 	if err != nil {
 		log.Fatalf("Unable to read hosts from JSON file: %v", err)
 	}
 
-	// Initialize the ansible object that contains the json string field
-	ans := new(ansible)
-	ans.json = "{}"
-	ans.json, err = sjson.Set(ans.json, "_meta", "hostvars")
+	// Initialize the inventory object that contains the json string field
+	inv.json = "{}"
+	inv.json, err = sjson.Set(inv.json, "_meta", "hostvars")
 	if err != nil {
 		log.Fatal(err)
 	}
-	ans.parseHosts(hosts)
-	ans.parseHostCollections(hosts, cache)
+	inv.parseHosts(hosts)
+	inv.parseHostCollections(hosts)
 	// For human readability, put an LF on the end of the json.
-	ans.json += "\n"
+	inv.json += "\n"
 	if flags.List {
-		_, err = fmt.Fprint(os.Stdout, ans.json)
+		_, err = fmt.Fprint(os.Stdout, inv.json)
 		if err != nil {
 			log.Fatalf("Fprintf: %v", err)
 		}
 	}
-	err = ioutil.WriteFile(cfg.OutJSON, []byte(ans.json), 0644)
+	err = ioutil.WriteFile(cfg.OutJSON, []byte(inv.json), 0644)
 	if err != nil {
 		log.Fatalf("WriteFile: %v", err)
 	}
 }
 
 // parseHosts creates the inventory hostvars metadata for each host
-func (ans *ansible) parseHosts(hosts gjson.Result) {
+func (inv *inventory) parseHosts(hosts gjson.Result) {
 	defer timeTrack(time.Now(), "parseHosts")
 	var err error
 
@@ -144,7 +146,7 @@ func (ans *ansible) parseHosts(hosts gjson.Result) {
 	// satValidAppend is a special string used by sjson to append entries to an inventory group
 	satValidAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
 	// Add sat_valid to the all{children} array
-	ans.json, err = sjson.Set(ans.json, "all.children.-1", cfg.InventoryPrefix+"valid")
+	inv.json, err = sjson.Set(inv.json, "all.children.-1", cfg.InventoryPrefix+"valid")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -158,37 +160,37 @@ func (ans *ansible) parseHosts(hosts gjson.Result) {
 		}
 		hostNameShort := shortName(h.Get("name").String())
 		key := fmt.Sprintf("_meta.hostvars.%s", hostNameShort)
-		ans.json, err = sjson.Set(ans.json, key, h.Value())
+		inv.json, err = sjson.Set(inv.json, key, h.Value())
 		if err != nil {
 			log.Fatal(err)
 		}
-		ans.hgSatValid(h, satValidAppend, hostNameShort)
+		inv.hgSatValid(h, satValidAppend, hostNameShort)
 		if len(cidr) > 0 {
-			ans.hgCIDRMembers(h, cidr)
+			inv.hgCIDRMembers(h, cidr)
 		}
 	}
 }
 
 // parseHostCollections iterates through the Satellite Host Collections and associates hostnames with the each
 // Collection's host_ids.
-func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache) {
+func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 	defer timeTrack(time.Now(), "parseHostCollections")
 	collectionsURL := fmt.Sprintf("%s/katello/api/host_collections", cfg.API.BaseURL)
-	cache.AddURL(collectionsURL, "host_collections.json")
-	collections, err := cache.GetURL(collectionsURL)
+	inv.cache.AddURL(collectionsURL, "host_collections.json")
+	collections, err := inv.cache.GetURL(collectionsURL)
 	if err != nil {
 		log.Fatalf("Unable to read JSON from file: %v", err)
 	}
 	for _, c := range collections.Get("results").Array() {
 		hostCollectionName := c.Get("name").String()
 		hostCollectionID := c.Get("id").String()
-		hostCollection, err := getHostCollection(hostCollectionID, cache)
+		hostCollection, err := inv.getHostCollection(hostCollectionID)
 		if err != nil {
 			log.Printf("Unable to get host_collection: %v", err)
 			continue
 		}
 		collectionKey := mkInventoryName(hostCollectionName)
-		ans.json, err = sjson.Set(ans.json, "all.children.-1", collectionKey)
+		inv.json, err = sjson.Set(inv.json, "all.children.-1", collectionKey)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -199,7 +201,7 @@ func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache
 				log.Printf("Cannot fetch host by ID: %v", err)
 				continue
 			}
-			ans.json, err = sjson.Set(ans.json, collectionAppend, shortName(host))
+			inv.json, err = sjson.Set(inv.json, collectionAppend, shortName(host))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -208,7 +210,7 @@ func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache
 }
 
 // satValid creates an inventory group of hosts the meet "valid" conditions.
-func (ans *ansible) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
+func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
 	// Check the host has an IP address
 	ip4 := host.Get("ip")
 	ip6 := host.Get("ip6")
@@ -250,7 +252,7 @@ func (ans *ansible) hgSatValid(host gjson.Result, satValidAppend, hostNameShort 
 	}
 
 	// All the above conditions passed; this is a valid host.
-	ans.json, err = sjson.Set(ans.json, satValidAppend, hostNameShort)
+	inv.json, err = sjson.Set(inv.json, satValidAppend, hostNameShort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -258,7 +260,7 @@ func (ans *ansible) hgSatValid(host gjson.Result, satValidAppend, hostNameShort 
 
 // hgCIDRMembers compares the IPv4 address of the current host to a list of CIDRs.  When the address is a member of a
 // CIDR, its appended to an inventory group for that CIDR.
-func (ans *ansible) hgCIDRMembers(host gjson.Result, cidr cidrs.Cidrs) {
+func (inv *inventory) hgCIDRMembers(host gjson.Result, cidr cidrs.Cidrs) {
 	hostNameShort := shortName(host.Get("name").String())
 
 	// Test the validity of the address for CIDR membership processing.
@@ -277,7 +279,7 @@ func (ans *ansible) hgCIDRMembers(host gjson.Result, cidr cidrs.Cidrs) {
 	var err error
 	for _, invGrp := range invGrps {
 		sjKey := fmt.Sprintf("%s.hosts.-1", mkInventoryName(invGrp))
-		ans.json, err = sjson.Set(ans.json, sjKey, hostNameShort)
+		inv.json, err = sjson.Set(inv.json, sjKey, hostNameShort)
 		if err != nil {
 			log.Printf("hgCIDRMembers: %s: %v", hostNameShort, err)
 		}
@@ -293,7 +295,7 @@ func timeTrack(start time.Time, name string) {
 func main() {
 	var err error
 	flags = config.ParseFlags()
-	// For normal use, log output needs to be surpressed or ansible's dynamic inventory will try to process it.
+	// For normal use, log output needs to be surpressed or inventory's dynamic inventory will try to process it.
 	if !flags.Debug {
 		log.SetOutput(ioutil.Discard)
 	}
