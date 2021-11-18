@@ -3,6 +3,8 @@ package config
 import (
 	"io/ioutil"
 	"os"
+	"os/user"
+	"path"
 	"testing"
 )
 
@@ -33,5 +35,33 @@ func TestConfig(t *testing.T) {
 
 	if cfg.OutJSON != fakeCfg.OutJSON {
 		t.Fatalf("Expected cfg.OutJSON to contain \"%v\" but got \"%v\".", fakeCfg.OutJSON, cfg.OutJSON)
+	}
+}
+
+func TestExpandTilde(t *testing.T) {
+	u, err := user.Current()
+	if err != nil {
+		t.Fatalf("Unable to ascertain current user: %v", err)
+	}
+	// Test homedir, without path
+	testDir := "~"
+	expectDir := u.HomeDir
+	resultDir := expandTilde(testDir)
+	if expectDir != resultDir {
+		t.Errorf("Tilde expansion failed.  Expected=%s, Got=%s", expectDir, resultDir)
+	}
+	// Test homedir with path
+	testDir = "~/dir1/dir2/filename"
+	expectDir = path.Join(u.HomeDir, "dir1/dir2/filename")
+	resultDir = expandTilde(testDir)
+	if expectDir != resultDir {
+		t.Errorf("Tilde expansion failed.  Expected=%s, Got=%s", expectDir, resultDir)
+	}
+	// Test path without homedir
+	testDir = "/dir1/dir2/filename"
+	expectDir = "/dir1/dir2/filename"
+	resultDir = expandTilde(testDir)
+	if expectDir != resultDir {
+		t.Errorf("Tilde expansion failed.  Expected=%s, Got=%s", expectDir, resultDir)
 	}
 }

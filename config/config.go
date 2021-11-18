@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
-// Config contains all the configuration settings for Yamn.
+// Config contains all the configuration settings
 type Config struct {
 	API struct {
 		BaseURL  string `yaml:"baseurl"`
@@ -20,9 +21,8 @@ type Config struct {
 		User     string `yaml:"user"`
 	} `yaml:"api"`
 	Cache struct {
-		HomeDir  bool   `yaml:"use_homedir"`
-		Dir      string `yaml:"cache_dir"`
-		Validity int64  `yaml:"cache_validity"`
+		Dir      string `yaml:"dir"`
+		Validity int64  `yaml:"validity"`
 	} `yaml:"cache"`
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
@@ -84,34 +84,34 @@ func ParseConfig(filename string) (*Config, error) {
 
 	y := yaml.NewDecoder(file)
 	config := new(Config)
+	// Set config defaults here before reading the config file
+	config.SatValidDays = 7
+	config.Cache.Validity = 8 * 60 * 60
+	config.InventoryPrefix = "sat_"
+	config.OutJSON = "/tmp/satinv.json"
+	// Read the config file
 	if err := y.Decode(&config); err != nil {
 		return nil, err
 	}
-	// Default sat_valid period to one week
-	if config.SatValidDays == 0 {
-		config.SatValidDays = 7
-	}
-	// Set default cache validity to 8 hours
-	if config.Cache.Validity == 0 {
-		config.Cache.Validity = 8 * 60 * 60
-	}
-	// Set default inventory InventoryPrefix
-	if config.InventoryPrefix == "" {
-		config.InventoryPrefix = "sat_"
-	}
-	// Set default target_filename
-	if config.OutJSON == "" {
-		config.OutJSON = "/tmp/satinv.json"
-	}
-	// If the CacheHomeDir boolean is true, other config paths will be relative to the user's HomeDir.
-	// This overcomes issues with multiple users trying to read/write to a common cache.
-	if config.Cache.HomeDir {
-		user, err := user.Current()
-		if err != nil {
-			panic(err)
-		}
-		config.OutJSON = path.Join(user.HomeDir, config.OutJSON)
-		config.Cache.Dir = path.Join(user.HomeDir, config.Cache.Dir)
-	}
+	// The following config options may need tilde expansion
+	config.OutJSON = expandTilde(config.OutJSON)
+	config.Cache.Dir = expandTilde(config.Cache.Dir)
+
 	return config, nil
+}
+
+// expandTilde expands filenames and paths that use the tilde convention to imply relative to homedir.
+func expandTilde(inPath string) (outPath string) {
+	u, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	if inPath == "~" {
+		outPath = u.HomeDir
+	} else if strings.HasPrefix(inPath, "~/") {
+		outPath = path.Join(u.HomeDir, inPath[2:])
+	} else {
+		outPath = inPath
+	}
+	return
 }
