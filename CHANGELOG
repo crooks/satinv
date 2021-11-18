@@ -1,0 +1,11 @@
+2021-11-17 v0.0.3
+    * Add a CHANGELOG.
+    * Create config sections for API and Cache settings
+    * Add support for homedir (~) expansion in paths
+    * Remove redundant use_homedir config option (see above change)
+
+2021-10-21 v0.0.2
+    * Add a use_homedir option to make paths relative to homedir
+
+2021-09-01 v0.0.1
+    * Initial release
