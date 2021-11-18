@@ -62,7 +62,7 @@ func mkInventoryName(s string) string {
 
 // getHostCollection takes an ID string and returns the Host Collection associated with it.
 func getHostCollection(id string, cache *cacher.Cache) (gjson.Result, error) {
-	collectionURL := fmt.Sprintf("%s/katello/api/host_collections/%s", cfg.APIBaseURL, id)
+	collectionURL := fmt.Sprintf("%s/katello/api/host_collections/%s", cfg.API.BaseURL, id)
 	collectionFilename := fmt.Sprintf("host_collections_%s.json", id)
 	cache.AddURL(collectionURL, collectionFilename)
 	collection, err := cache.GetURL(collectionURL)
@@ -90,16 +90,16 @@ func importCIDRs() cidrs.Cidrs {
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
 func mkInventory() {
 	// Initialize the URL cache
-	cache := cacher.NewCacher(cfg.CacheDir)
-	cache.SetCacheDuration(cfg.CacheValidity)
-	cache.InitAPI(cfg.APIUser, cfg.APIPassword, cfg.APICertFile)
+	cache := cacher.NewCacher(cfg.Cache.Dir)
+	cache.SetCacheDuration(cfg.Cache.Validity)
+	cache.InitAPI(cfg.API.User, cfg.API.Password, cfg.API.CertFile)
 	if flags.Refresh {
 		// Force a cache refresh
 		cache.SetRefresh()
 	}
 
 	// Populate the hosts object
-	hostsURL := fmt.Sprintf("%s/api/v2/hosts?per_page=1000", cfg.APIBaseURL)
+	hostsURL := fmt.Sprintf("%s/api/v2/hosts?per_page=1000", cfg.API.BaseURL)
 	cache.AddURL(hostsURL, "hosts.json")
 	hosts, err := cache.GetURL(hostsURL)
 	if err != nil {
@@ -173,7 +173,7 @@ func (ans *ansible) parseHosts(hosts gjson.Result) {
 // Collection's host_ids.
 func (ans *ansible) parseHostCollections(hosts gjson.Result, cache *cacher.Cache) {
 	defer timeTrack(time.Now(), "parseHostCollections")
-	collectionsURL := fmt.Sprintf("%s/katello/api/host_collections", cfg.APIBaseURL)
+	collectionsURL := fmt.Sprintf("%s/katello/api/host_collections", cfg.API.BaseURL)
 	cache.AddURL(collectionsURL, "host_collections.json")
 	collections, err := cache.GetURL(collectionsURL)
 	if err != nil {

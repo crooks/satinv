@@ -13,13 +13,17 @@ import (
 
 // Config contains all the configuration settings for Yamn.
 type Config struct {
-	APIBaseURL      string            `yaml:"api_baseurl"`
-	APICertFile     string            `yaml:"api_certfile"`
-	APIPassword     string            `yaml:"api_password"`
-	APIUser         string            `yaml:"api_user"`
-	HomeDir         bool              `yaml:"use_homedir"`
-	CacheDir        string            `yaml:"cache_dir"`
-	CacheValidity   int64             `yaml:"cache_validity"`
+	API struct {
+		BaseURL  string `yaml:"baseurl"`
+		CertFile string `yaml:"certfile"`
+		Password string `yaml:"password"`
+		User     string `yaml:"user"`
+	} `yaml:"api"`
+	Cache struct {
+		HomeDir  bool   `yaml:"use_homedir"`
+		Dir      string `yaml:"cache_dir"`
+		Validity int64  `yaml:"cache_validity"`
+	} `yaml:"cache"`
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
 	OutJSON         string            `yaml:"target_filename"`
@@ -88,8 +92,8 @@ func ParseConfig(filename string) (*Config, error) {
 		config.SatValidDays = 7
 	}
 	// Set default cache validity to 8 hours
-	if config.CacheValidity == 0 {
-		config.CacheValidity = 8 * 60 * 60
+	if config.Cache.Validity == 0 {
+		config.Cache.Validity = 8 * 60 * 60
 	}
 	// Set default inventory InventoryPrefix
 	if config.InventoryPrefix == "" {
@@ -101,13 +105,13 @@ func ParseConfig(filename string) (*Config, error) {
 	}
 	// If the CacheHomeDir boolean is true, other config paths will be relative to the user's HomeDir.
 	// This overcomes issues with multiple users trying to read/write to a common cache.
-	if config.HomeDir {
+	if config.Cache.HomeDir {
 		user, err := user.Current()
 		if err != nil {
 			panic(err)
 		}
 		config.OutJSON = path.Join(user.HomeDir, config.OutJSON)
-		config.CacheDir = path.Join(user.HomeDir, config.CacheDir)
+		config.Cache.Dir = path.Join(user.HomeDir, config.Cache.Dir)
 	}
 	return config, nil
 }
