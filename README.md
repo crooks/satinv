@@ -19,14 +19,16 @@ The configuration for **satinv** lives in a single YAML formatted file.  The fil
 The location can be overridden with `--config=/path/to/config.yml` or by setting the environment variable `SATINVCFG`.  **Note**: You cannot use the --config option when running satinv from `ansible-playbook` or `ansible-inventory`.  This is a constraint imposed by Ansible.  A basic config file could be:
 ```
 ---
-api_baseurl: https://www.redhat.mydomain.com
-api_user: myreadonlyuser
-api_password: myPassword
+api:
+  baseurl: https://www.redhat.mydomain.com
+  user: myreadonlyuser
+  password: myPassword
 
-cache_dir: /var/local/cache/satinv
-cache_validity: 28800
+cache:
+  dir: ~/satinv/cache
+  validity: 28800
 
-target_filename: /tmp/satinv.json
+target_filename: ~/satinv/inventory.json
 
 cidrs:
   dev: 192.168.0.0/24

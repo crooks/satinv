@@ -61,7 +61,7 @@ func ParseFlags() *Flags {
 	flag.BoolVar(&f.Refresh, "refresh", false, "Force a cache refresh")
 	flag.Parse()
 
-	// If a "--config" flag has been provided, it should be honoured (even if it's invalid of doesn't exist).
+	// If a "--config" flag has been provided, it should be honoured (even if it's invalid or doesn't exist).
 	if f.Config == "" {
 		if os.Getenv("SATINVCFG") == "" {
 			// Environment variable hasn't been set.  No options left so take a bold guess at a config location.
