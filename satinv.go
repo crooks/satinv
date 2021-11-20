@@ -16,6 +16,10 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+const (
+	inventoryName string = "inventory"
+)
+
 var (
 	cfg   *config.Config
 	flags *config.Flags
@@ -88,18 +92,10 @@ func importCIDRs() cidrs.Cidrs {
 	return cidr
 }
 
-// mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
-func mkInventory() {
-	// Initialize an inventory struct
-	inv := new(inventory)
-	// Initialize the URL cache
-	inv.cache = cacher.NewCacher(cfg.Cache.Dir)
-	inv.cache.SetCacheDuration(cfg.Cache.Validity)
+// refreshInventory produces a new inventory.json copy from the Satellite API (or cache).
+func (inv *inventory) refreshInventory() {
+	// If URLs have to be pulled from an API, this has to be initialised.
 	inv.cache.InitAPI(cfg.API.User, cfg.API.Password, cfg.API.CertFile)
-	if flags.Refresh {
-		// Force a cache refresh
-		inv.cache.SetRefresh()
-	}
 
 	// Populate the hosts object
 	hostsURL := fmt.Sprintf("%s/api/v2/hosts?per_page=1000", cfg.API.BaseURL)
@@ -119,15 +115,41 @@ func mkInventory() {
 	inv.parseHostCollections(hosts)
 	// For human readability, put an LF on the end of the json.
 	inv.json += "\n"
+	err = ioutil.WriteFile(cfg.OutJSON, []byte(inv.json), 0644)
+	if err != nil {
+		log.Fatalf("WriteFile: %v", err)
+	}
+}
+
+// mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
+func mkInventory() {
+	// Initialize an inventory struct
+	inv := new(inventory)
+	// Initialize the URL cache
+	inv.cache = cacher.NewCacher(cfg.Cache.Dir)
+	inv.cache.SetCacheDuration(cfg.Cache.Validity)
+	if flags.Refresh {
+		// Force a cache refresh
+		inv.cache.SetRefresh()
+	}
+
+	// This isn't a real URL; it never gets pulled from an API.  It contains the output inventory JSON and enables it
+	// to be cached.
+	inv.cache.AddURL(inventoryName, fmt.Sprintf("%s.json", inventoryName))
+	refresh, err := inv.cache.RefreshCache(inventoryName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if refresh {
+		inv.refreshInventory()
+	} else {
+		inv.json = string(inv.cache.GetFile(inventoryName))
+	}
 	if flags.List {
 		_, err = fmt.Fprint(os.Stdout, inv.json)
 		if err != nil {
 			log.Fatalf("Fprintf: %v", err)
 		}
-	}
-	err = ioutil.WriteFile(cfg.OutJSON, []byte(inv.json), 0644)
-	if err != nil {
-		log.Fatalf("WriteFile: %v", err)
 	}
 }
 

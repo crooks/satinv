@@ -1,9 +1,11 @@
 package cacher
 
 import (
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -75,7 +77,7 @@ func TestGetURL(t *testing.T) {
 	}
 	c.AddURL(testURL, testFile)
 	_, err = c.GetURL(testURL)
-	if err != nil {
+	if !errors.Is(err, errAPIInit) {
 		t.Fatalf("Error: %v", err)
 	}
 }
@@ -91,7 +93,8 @@ func TestExportExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gj, err := c.jsonFromFile(cacheExpiryFile)
+	filename := path.Join(tempDir, cacheExpiryFile)
+	gj, err := c.jsonFromFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}
