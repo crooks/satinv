@@ -19,13 +19,12 @@ func TestFlags(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	testFile, err := ioutil.TempFile("/tmp", "yamn")
+	testFile, err := ioutil.TempFile("/tmp", "testcfg")
 	if err != nil {
 		t.Fatalf("Unable to create TempFile: %v", err)
 	}
 	defer os.Remove(testFile.Name())
 	fakeCfg := new(Config)
-	fakeCfg.OutJSON = "fake_file.json"
 	fakeCfg.WriteConfig(testFile.Name())
 
 	cfg, err := ParseConfig(testFile.Name())
@@ -33,8 +32,8 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("ParseConfig returned: %v", err)
 	}
 
-	if cfg.OutJSON != fakeCfg.OutJSON {
-		t.Fatalf("Expected cfg.OutJSON to contain \"%v\" but got \"%v\".", fakeCfg.OutJSON, cfg.OutJSON)
+	if cfg.SatValidDays != fakeCfg.SatValidDays {
+		t.Fatalf("Unexpected config.SatValidDays. Expected=%d, Got=%d", fakeCfg.SatValidDays, cfg.SatValidDays)
 	}
 }
 

@@ -2,10 +2,12 @@ package cacher
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,7 +63,7 @@ func TestWrite(t *testing.T) {
 	c := NewCacher(tempDir)
 	sample := `{"results": ["a","b","c"]}`
 	j := gjson.Parse(sample)
-	c.jsonToFile("test.json", j)
+	c.jsonToFile(path.Join(tempDir, "test.json"), j)
 }
 
 func TestGetURL(t *testing.T) {
@@ -86,23 +88,62 @@ func TestExportExpiry(t *testing.T) {
 	tempDir := mkTempDir()
 	defer os.RemoveAll(tempDir)
 	c := NewCacher(tempDir)
-	testURL := "http://fakeurl.fake"
+	testItem := "http://fakeurl.fake"
 	testFile := "test.json"
-	c.AddURL(testURL, testFile)
-	err := c.exportExpiry()
+	c.AddURL(testItem, testFile)
+	// UpdateExpiry also writes the JSON to the test.json file.
+	testExpire, err := c.UpdateExpiry(testItem)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Create an empty file for the cache item.  This prevents HasExpired from returning true due to the absense of
+	// the file.
+	fullTestFile := path.Join(tempDir, testFile)
+	emptyFile, err := os.Create(fullTestFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	emptyFile.Close()
+
+	// Test the cache item filename matches testFile
+	if c.GetFilename(testItem) != fullTestFile {
+		t.Errorf("Unexpected filename: Expected=%s, Got=%s", fullTestFile, c.GetFilename(testItem))
+	}
+
+	// Fetch the JSON from tempfile
 	filename := path.Join(tempDir, cacheExpiryFile)
 	gj, err := c.jsonFromFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}
-	testExpire := gj.Get("urls.testURL").Int()
-	if !gj.Exists() {
-		t.Fatal("Expected urls key does not exist")
+	// For gjson, the dot needs to be escaped.
+	gjSafeItem := strings.Replace(testItem, ".", "\\.", -1)
+	gjItem := fmt.Sprintf("urls.%s", gjSafeItem)
+	//getURL := "urls.http://fakeurl\\.fake"
+	getItem := gj.Get(gjItem)
+	if !getItem.Exists() {
+		t.Errorf("Expected url key does not exist: %s", testItem)
 	}
-	if testExpire != 0 {
-		t.Fatalf("Unexpected expiry value.  Expected=0, Got=%d", testExpire)
+	getExpire := getItem.Int()
+	if getExpire != testExpire {
+		t.Fatalf("Unexpected expiry value.  Expected=%d, Got=%d", testExpire, getExpire)
+	}
+
+	// Test HasExpired.
+	expiry, err := c.HasExpired(testItem)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if expiry {
+		t.Error("Item cache should not be expired")
+	}
+	// Reset the item cache expiry to epoch zero (expired)
+	c.cacheExpiry[testItem] = 0
+	expiry, err = c.HasExpired(testItem)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !expiry {
+		t.Error("Item cache should be expired")
 	}
 }

@@ -115,10 +115,13 @@ func (inv *inventory) refreshInventory() {
 	inv.parseHostCollections(hosts)
 	// For human readability, put an LF on the end of the json.
 	inv.json += "\n"
-	err = ioutil.WriteFile(cfg.OutJSON, []byte(inv.json), 0644)
+	filename := inv.cache.GetFilename(inventoryName)
+	err = ioutil.WriteFile(filename, []byte(inv.json), 0644)
 	if err != nil {
 		log.Fatalf("WriteFile: %v", err)
 	}
+	// If the inventory has been successfully refreshed, updated the expiry file with a new refresh timestamp.
+	inv.cache.UpdateExpiry(inventoryName)
 }
 
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
@@ -136,7 +139,7 @@ func mkInventory() {
 	// This isn't a real URL; it never gets pulled from an API.  It contains the output inventory JSON and enables it
 	// to be cached.
 	inv.cache.AddURL(inventoryName, fmt.Sprintf("%s.json", inventoryName))
-	refresh, err := inv.cache.RefreshCache(inventoryName)
+	refresh, err := inv.cache.HasExpired(inventoryName)
 	if err != nil {
 		log.Fatal(err)
 	}

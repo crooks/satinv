@@ -26,7 +26,6 @@ type Config struct {
 	} `yaml:"cache"`
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
-	OutJSON         string            `yaml:"target_filename"`
 	SatValidDays    int               `yaml:"sat_valid_days"`
 }
 
@@ -88,13 +87,11 @@ func ParseConfig(filename string) (*Config, error) {
 	config.SatValidDays = 7
 	config.Cache.Validity = 8 * 60 * 60
 	config.InventoryPrefix = "sat_"
-	config.OutJSON = "/tmp/satinv.json"
 	// Read the config file
 	if err := y.Decode(&config); err != nil {
 		return nil, err
 	}
 	// The following config options may need tilde expansion
-	config.OutJSON = expandTilde(config.OutJSON)
 	config.Cache.Dir = expandTilde(config.Cache.Dir)
 
 	return config, nil

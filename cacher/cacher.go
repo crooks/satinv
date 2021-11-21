@@ -47,6 +47,14 @@ func NewCacher(cacheDir string) *Cache {
 	return c
 }
 
+func (c *Cache) GetFilename(item string) (filename string) {
+	var ok bool
+	if filename, ok = c.cacheFiles[item]; !ok {
+		log.Fatalf("No cache file associated with item \"%s\"", item)
+	}
+	return
+}
+
 func (c *Cache) InitAPI(username, password, cert string) {
 	c.api = satapi.NewBasicAuthClient(username, password, cert)
 	c.apiInit = true
@@ -55,9 +63,10 @@ func (c *Cache) InitAPI(username, password, cert string) {
 // SetRefresh instructs GetURL to ignore cached files
 func (c *Cache) SetRefresh() {
 	c.cacheRefresh = true
+	log.Print("Forcing cache refresh")
 }
 
-func (c *Cache) RefreshCache(apiURL string) (refresh bool, err error) {
+func (c *Cache) HasExpired(apiURL string) (refresh bool, err error) {
 	var fileName string
 	var ok bool
 	var expire int64
@@ -147,6 +156,13 @@ func (c *Cache) exportExpiry() error {
 	return nil
 }
 
+func (c *Cache) UpdateExpiry(item string) (expire int64, err error) {
+	expire = c.expireTime()
+	c.cacheExpiry[item] = expire
+	err = c.exportExpiry()
+	return
+}
+
 func (c *Cache) getURLFromAPI(apiURL string) (gj gjson.Result, err error) {
 	if !c.apiInit {
 		err = errAPIInit
@@ -165,13 +181,12 @@ func (c *Cache) getURLFromAPI(apiURL string) (gj gjson.Result, err error) {
 		return
 	}
 	// We have successfully retreived a URL so export the expiry Cache to file.
-	c.cacheExpiry[apiURL] = c.expireTime()
-	err = c.exportExpiry()
+	_, err = c.UpdateExpiry(apiURL)
 	return
 }
 
 func (c *Cache) GetURL(apiURL string) (gj gjson.Result, err error) {
-	refresh, err := c.RefreshCache(apiURL)
+	refresh, err := c.HasExpired(apiURL)
 	if err != nil {
 		return
 	}
@@ -189,8 +204,7 @@ func (c *Cache) GetURL(apiURL string) (gj gjson.Result, err error) {
 }
 
 func (c *Cache) GetFile(item string) []byte {
-	filename := path.Join(c.cacheDir, c.cacheFiles[item])
-	b, err := ioutil.ReadFile(filename)
+	b, err := ioutil.ReadFile(c.cacheFiles[item])
 	if err != nil {
 		log.Fatal(err)
 	}
