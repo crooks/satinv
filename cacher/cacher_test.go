@@ -44,9 +44,9 @@ func TestExpire(t *testing.T) {
 	var durationSecs int64 = 2
 	c.SetCacheDuration(durationSecs)
 	now := time.Now().Unix()
-	expire := c.expireTime()
+	expire := expireTime(c.cachePeriod)
 	if abs(expire-(now+durationSecs)) > 2 {
-		t.Fatalf("Unexpected cachePeriod.  Expected=%d, Got=%d", c.expireTime(), now)
+		t.Fatalf("Unexpected cachePeriod.  Expected=%d, Got=%d", expire, now)
 	}
 	if time.Now().Unix() > expire {
 		t.Fatal("Cache should not be expired")
@@ -92,10 +92,9 @@ func TestExportExpiry(t *testing.T) {
 	testFile := "test.json"
 	c.AddURL(testItem, testFile)
 	// UpdateExpiry also writes the JSON to the test.json file.
-	testExpire, err := c.UpdateExpiry(testItem)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testExpire := c.UpdateExpiry(testItem, c.cachePeriod)
+	c.WriteExpiryFile()
+
 	// Create an empty file for the cache item.  This prevents HasExpired from returning true due to the absense of
 	// the file.
 	fullTestFile := path.Join(tempDir, testFile)

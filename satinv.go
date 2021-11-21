@@ -121,7 +121,8 @@ func (inv *inventory) refreshInventory() {
 		log.Fatalf("WriteFile: %v", err)
 	}
 	// If the inventory has been successfully refreshed, updated the expiry file with a new refresh timestamp.
-	inv.cache.UpdateExpiry(inventoryName)
+	// TODO: Make the inventory cache duration configurable
+	inv.cache.UpdateExpiry(inventoryName, 3600)
 }
 
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
@@ -130,6 +131,8 @@ func mkInventory() {
 	inv := new(inventory)
 	// Initialize the URL cache
 	inv.cache = cacher.NewCacher(cfg.Cache.Dir)
+	// When this function completes, write the expiry file (if one or more cache items have been refreshed).
+	defer inv.cache.WriteExpiryFile()
 	inv.cache.SetCacheDuration(cfg.Cache.Validity)
 	if flags.Refresh {
 		// Force a cache refresh

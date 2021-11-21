@@ -33,6 +33,7 @@ type Cache struct {
 	cacheFiles   map[string]string // k=url, v=cacheFile
 	cachePeriod  int64             // Seconds
 	cacheRefresh bool              // Ignore the cache and grab new URLs
+	writeExpiry  bool              // Write expiry data to disk
 }
 
 func NewCacher(cacheDir string) *Cache {
@@ -130,12 +131,14 @@ func (c *Cache) importExpiry() {
 		if epochExpiry > ageLimit {
 			log.Printf("Importing Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
 			c.cacheExpiry[k] = epochExpiry
-		} else {
+		} else if epochExpiry > 0 {
+			// Only log housekeeping for expiry times greater than 0
 			log.Printf("Housekeeping old Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
 		}
 	}
 }
 
+// exportExpiry writes the cache expiry map to a file in JSON format.
 func (c *Cache) exportExpiry() error {
 	sj, err := sjson.Set("", "write_time", timestamp())
 	if err != nil {
@@ -156,13 +159,21 @@ func (c *Cache) exportExpiry() error {
 	return nil
 }
 
-func (c *Cache) UpdateExpiry(item string) (expire int64, err error) {
-	expire = c.expireTime()
-	c.cacheExpiry[item] = expire
-	err = c.exportExpiry()
+// UpdateExpiry revises the expiry time of a given cache item.
+func (c *Cache) UpdateExpiry(item string, period int64) (newExpire int64) {
+	newExpire = expireTime(period)
+	c.cacheExpiry[item] = newExpire
+	c.writeExpiry = true
 	return
 }
 
+func (c *Cache) WriteExpiryFile() {
+	if c.writeExpiry {
+		c.exportExpiry()
+	}
+}
+
+// getURLFromAPI is called when a cache item has expired and a new copy needs to be grabbed from the API.
 func (c *Cache) getURLFromAPI(apiURL string) (gj gjson.Result, err error) {
 	if !c.apiInit {
 		err = errAPIInit
@@ -180,11 +191,13 @@ func (c *Cache) getURLFromAPI(apiURL string) (gj gjson.Result, err error) {
 		err = fmt.Errorf("unable to read JSON: %v", err)
 		return
 	}
-	// We have successfully retreived a URL so export the expiry Cache to file.
-	_, err = c.UpdateExpiry(apiURL)
+	// We have successfully retreived a URL so update its cache expiry time.
+	c.UpdateExpiry(apiURL, c.cachePeriod)
 	return
 }
 
+// GetURL returns the file content associated with a cache key.  If the cache has expired, the content will instead be
+// grabbed from the API.
 func (c *Cache) GetURL(apiURL string) (gj gjson.Result, err error) {
 	refresh, err := c.HasExpired(apiURL)
 	if err != nil {
@@ -203,6 +216,7 @@ func (c *Cache) GetURL(apiURL string) (gj gjson.Result, err error) {
 	return
 }
 
+// GetFile reads a cache item's file from disk and returns it as a byte slice.
 func (c *Cache) GetFile(item string) []byte {
 	b, err := ioutil.ReadFile(c.cacheFiles[item])
 	if err != nil {
@@ -214,12 +228,12 @@ func (c *Cache) GetFile(item string) []byte {
 // SetCacheDuration defines the expiry period in seconds for each cached file.
 func (c *Cache) SetCacheDuration(sec int64) {
 	c.cachePeriod = sec
-	log.Printf("Cache period set to %d seconds", c.cachePeriod)
+	log.Printf("Default cache period set to %d seconds", c.cachePeriod)
 }
 
 // expireTime calculates the Epoch time for a Cache expiry
-func (c *Cache) expireTime() int64 {
-	expire := time.Now().Unix() + c.cachePeriod
+func expireTime(cacheDuration int64) int64 {
+	expire := time.Now().Unix() + cacheDuration
 	return expire
 }
 
