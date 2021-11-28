@@ -12,6 +12,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	defaultSatValidDays             int   = 7
+	defaultCacheValiditySeconds     int64 = 8 * 60 * 60 // 8 Hours
+	defaultInventoryValiditySeconds int64 = 2 * 60 * 60 // 2 Hours
+)
+
 // Config contains all the configuration settings
 type Config struct {
 	API struct {
@@ -21,8 +27,9 @@ type Config struct {
 		User     string `yaml:"user"`
 	} `yaml:"api"`
 	Cache struct {
-		Dir      string `yaml:"dir"`
-		Validity int64  `yaml:"validity"`
+		Dir               string `yaml:"dir"`
+		Validity          int64  `yaml:"validity"`
+		InventoryValidity int64  `yaml:"inventory_validity"`
 	} `yaml:"cache"`
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
@@ -83,14 +90,21 @@ func ParseConfig(filename string) (*Config, error) {
 
 	y := yaml.NewDecoder(file)
 	config := new(Config)
-	// Set config defaults here before reading the config file
-	config.SatValidDays = 7
-	config.Cache.Validity = 8 * 60 * 60
-	config.InventoryPrefix = "sat_"
 	// Read the config file
 	if err := y.Decode(&config); err != nil {
 		return nil, err
 	}
+	// Set config defaults here
+	if config.SatValidDays == 0 {
+		config.SatValidDays = defaultSatValidDays
+	}
+	if config.Cache.Validity == 0 {
+		config.Cache.Validity = defaultCacheValiditySeconds
+	}
+	if config.Cache.InventoryValidity == 0 {
+		config.Cache.InventoryValidity = defaultInventoryValiditySeconds
+	}
+
 	// The following config options may need tilde expansion
 	config.Cache.Dir = expandTilde(config.Cache.Dir)
 

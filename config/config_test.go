@@ -25,6 +25,10 @@ func TestConfig(t *testing.T) {
 	}
 	defer os.Remove(testFile.Name())
 	fakeCfg := new(Config)
+	fakeCfg.SatValidDays = defaultSatValidDays
+	fakeCfg.Cache.Validity = defaultCacheValiditySeconds
+	fakeCfg.Cache.InventoryValidity = defaultInventoryValiditySeconds
+	fakeCfg.InventoryPrefix = "sat_"
 	fakeCfg.WriteConfig(testFile.Name())
 
 	cfg, err := ParseConfig(testFile.Name())
@@ -32,8 +36,24 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("ParseConfig returned: %v", err)
 	}
 
-	if cfg.SatValidDays != fakeCfg.SatValidDays {
-		t.Fatalf("Unexpected config.SatValidDays. Expected=%d, Got=%d", fakeCfg.SatValidDays, cfg.SatValidDays)
+	if cfg.SatValidDays != fakeCfg.SatValidDays || cfg.SatValidDays != defaultSatValidDays {
+		t.Fatalf(
+			"Unexpected config.SatValidDays. Default=%d, Expected=%d, Got=%d",
+			defaultSatValidDays, fakeCfg.SatValidDays, cfg.SatValidDays)
+	}
+	if cfg.Cache.Validity != fakeCfg.Cache.Validity || cfg.Cache.Validity != defaultCacheValiditySeconds {
+		t.Fatalf(
+			"Unexpected config.Cache.Validity. Default=%d, Expected=%d, Got=%d",
+			defaultCacheValiditySeconds, fakeCfg.Cache.Validity, cfg.Cache.Validity)
+	}
+	if cfg.Cache.InventoryValidity != fakeCfg.Cache.InventoryValidity || cfg.Cache.InventoryValidity != defaultInventoryValiditySeconds {
+		t.Fatalf(
+			"Unexpected config.Cache.InventoryValidity. Default=%d, Expected=%d, Got=%d",
+			defaultInventoryValiditySeconds, fakeCfg.Cache.InventoryValidity, cfg.Cache.InventoryValidity)
+	}
+	if cfg.InventoryPrefix != fakeCfg.InventoryPrefix {
+		t.Errorf(
+			"Unexpected InventoryPrefix. Expected=%s, Got=%s", fakeCfg.InventoryPrefix, cfg.InventoryPrefix)
 	}
 }
 

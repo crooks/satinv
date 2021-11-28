@@ -48,6 +48,7 @@ func NewCacher(cacheDir string) *Cache {
 	return c
 }
 
+// GetFilename returns the filename for a given cache item
 func (c *Cache) GetFilename(item string) (filename string) {
 	var ok bool
 	if filename, ok = c.cacheFiles[item]; !ok {
@@ -56,42 +57,44 @@ func (c *Cache) GetFilename(item string) (filename string) {
 	return
 }
 
+// InitAPI constructs a new instance of the Satellite API
 func (c *Cache) InitAPI(username, password, cert string) {
 	c.api = satapi.NewBasicAuthClient(username, password, cert)
 	c.apiInit = true
 }
 
-// SetRefresh instructs GetURL to ignore cached files
+// SetRefresh instructs GetURL to ignore cached files and fetch (and cache) new copies.
 func (c *Cache) SetRefresh() {
 	c.cacheRefresh = true
 	log.Print("Forcing cache refresh")
 }
 
-func (c *Cache) HasExpired(apiURL string) (refresh bool, err error) {
+// HasExpired takes a cache item and determines if it needs refreshing
+func (c *Cache) HasExpired(item string) (refresh bool, err error) {
 	var fileName string
 	var ok bool
 	var expire int64
 	// Test if the cacheFiles map contains the URL
-	if fileName, ok = c.cacheFiles[apiURL]; !ok {
-		err = fmt.Errorf("no cache file associated with %s", apiURL)
+	if fileName, ok = c.cacheFiles[item]; !ok {
+		err = fmt.Errorf("no cache file associated with %s", item)
 		return
 	}
 	if c.cacheRefresh {
 		// Instructed to force a refresh
-		log.Printf("Forced refresh of %s", apiURL)
+		log.Printf("Forced refresh of %s", item)
 		refresh = true
 	} else if _, existErr := os.Stat(fileName); os.IsNotExist(existErr) {
 		// File associated with the URL doesn't exist
-		log.Printf("Cache file %s for URL %s does not exist", fileName, apiURL)
+		log.Printf("Cache file %s for URL %s does not exist", fileName, item)
 		refresh = true
-	} else if expire, ok = c.cacheExpiry[apiURL]; !ok {
+	} else if expire, ok = c.cacheExpiry[item]; !ok {
 		// There should always be an expiry entry associated with a URL because the addURL function creates it. Despite
 		// this, we'll attempt to fetch the URL and create an expiry key for it.
-		log.Printf("No Cache expiry data for URL: %s", apiURL)
+		log.Printf("No Cache expiry data for URL: %s", item)
 		refresh = true
 	} else if time.Now().Unix() > expire {
 		// The Cache entry has expired
-		log.Printf("Cache for %s has expired", apiURL)
+		log.Printf("Cache for %s has expired", item)
 		refresh = true
 	} else {
 		refresh = false
@@ -101,12 +104,12 @@ func (c *Cache) HasExpired(apiURL string) (refresh bool, err error) {
 
 // AddURL registers a URL with a filename to contain its cached data.  If the URL has no expiry associated with it, a
 // new entry is created in the expiry cache and immediately set to expired.
-func (c *Cache) AddURL(apiURL, fileName string) {
-	c.cacheFiles[apiURL] = path.Join(c.cacheDir, fileName)
-	if _, ok := c.cacheExpiry[apiURL]; !ok {
+func (c *Cache) AddURL(item, fileName string) {
+	c.cacheFiles[item] = path.Join(c.cacheDir, fileName)
+	if _, ok := c.cacheExpiry[item]; !ok {
 		// Create an expiry key for the URL and expire it.
-		log.Printf("No Cache entry for %s.  Adding a new one.", apiURL)
-		c.cacheExpiry[apiURL] = 0
+		log.Printf("No Cache entry for %s.  Adding a new one.", item)
+		c.cacheExpiry[item] = 0
 	}
 }
 
@@ -167,6 +170,8 @@ func (c *Cache) UpdateExpiry(item string, period int64) (newExpire int64) {
 	return
 }
 
+// WriteExpiryFile writes the cache inventory to disk if writeExpiry is true.  The writeExpiry boolean indicates that
+// at least one cache item has been refreshed.
 func (c *Cache) WriteExpiryFile() {
 	if c.writeExpiry {
 		c.exportExpiry()
@@ -174,44 +179,44 @@ func (c *Cache) WriteExpiryFile() {
 }
 
 // getURLFromAPI is called when a cache item has expired and a new copy needs to be grabbed from the API.
-func (c *Cache) getURLFromAPI(apiURL string) (gj gjson.Result, err error) {
+func (c *Cache) getURLFromAPI(item string) (gj gjson.Result, err error) {
 	if !c.apiInit {
 		err = errAPIInit
 		return
 	}
-	log.Printf("Requested retreival of: %s", apiURL)
-	bytes, err := c.api.GetJSON(apiURL)
+	log.Printf("Requested retreival of: %s", item)
+	bytes, err := c.api.GetJSON(item)
 	if err != nil {
-		err = fmt.Errorf("unable to parse %s: %v", apiURL, err)
+		err = fmt.Errorf("unable to parse %s: %v", item, err)
 		return
 	}
 	gj = gjson.ParseBytes(bytes)
-	err = c.jsonToFile(c.cacheFiles[apiURL], gj)
+	err = c.jsonToFile(c.cacheFiles[item], gj)
 	if err != nil {
 		err = fmt.Errorf("unable to read JSON: %v", err)
 		return
 	}
 	// We have successfully retreived a URL so update its cache expiry time.
-	c.UpdateExpiry(apiURL, c.cachePeriod)
+	c.UpdateExpiry(item, c.cachePeriod)
 	return
 }
 
 // GetURL returns the file content associated with a cache key.  If the cache has expired, the content will instead be
 // grabbed from the API.
-func (c *Cache) GetURL(apiURL string) (gj gjson.Result, err error) {
-	refresh, err := c.HasExpired(apiURL)
+func (c *Cache) GetURL(item string) (gj gjson.Result, err error) {
+	refresh, err := c.HasExpired(item)
 	if err != nil {
 		return
 	}
 	if refresh {
-		gj, err = c.getURLFromAPI(apiURL)
+		gj, err = c.getURLFromAPI(item)
 		return
 	}
 	// Try and get the requested json from the Cache File
-	gj, err = c.jsonFromFile(c.cacheFiles[apiURL])
+	gj, err = c.jsonFromFile(c.cacheFiles[item])
 	if err != nil {
 		// Failed to read the Cache File, get it from the API instead
-		gj, err = c.getURLFromAPI(apiURL)
+		gj, err = c.getURLFromAPI(item)
 	}
 	return
 }
@@ -260,10 +265,10 @@ func (c *Cache) jsonToFile(filename string, gj gjson.Result) (err error) {
 // timestamp returns a string representation of the current time in ISO 8601 format.
 func timestamp() string {
 	t := time.Now()
-	iso8601 := "2006-01-02T15:04:05Z"
 	return t.Format(iso8601)
 }
 
+// timeEpoch returns an ISO8601 string representation of an given epoch time.
 func timeEpoch(epoch int64) string {
 	t := time.Unix(epoch, 0)
 	return t.Format(iso8601)

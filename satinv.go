@@ -86,6 +86,7 @@ func (inv *inventory) getHostCollection(id string) (gjson.Result, error) {
 	return collection, nil
 }
 
+// importCIDRs constructs a new instance of Cidrs and then populates it from a map in the Config.
 func importCIDRs() cidrs.Cidrs {
 	cidr := make(cidrs.Cidrs)
 	cidr.AddCIDRMap(cfg.CIDRs)
@@ -120,7 +121,7 @@ func (inv *inventory) refreshInventory() {
 	if err != nil {
 		log.Fatalf("WriteFile: %v", err)
 	}
-	// If the inventory has been successfully refreshed, updated the expiry file with a new refresh timestamp.
+	// If the inventory has been successfully refreshed, update the expiry file with a new refresh timestamp.
 	// TODO: Make the inventory cache duration configurable
 	inv.cache.UpdateExpiry(inventoryName, 3600)
 }
