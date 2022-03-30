@@ -240,15 +240,10 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 
 // satValid creates an inventory group of hosts the meet "valid" conditions.
 func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
-	// Check the host has an IP address
-	ip4 := host.Get("ip")
-	ip6 := host.Get("ip6")
-	if !ip4.Exists() && !ip6.Exists() {
-		log.Printf("satValid: No IP address found for %s", hostNameShort)
-		return
-	}
-	if ip4.String() == "" && ip6.String() == "" {
-		log.Printf("satValid: No valid IP addresses found for %s", hostNameShort)
+	// Check the host has a valid Operating System installed
+	osid := host.Get("operatingsystem_id")
+	if !osid.Exists() || osid.Int() == 0 {
+		log.Printf("satValid: No valid OS found for %s", hostNameShort)
 		return
 	}
 	// Ensure the host has a valid subscription
