@@ -3,7 +3,7 @@
 This program will generate an [Ansible](https://ansible.com) [Dynamic Inventory](https://docs.ansible.com/ansible/latest/user_guide/intro_dynamic_inventory.html) using [Red Hat Satellite](https://www.redhat.com/en/technologies/management/satellite) as a source.  The Dynamic Inventory will consist of a number of inventory groups:-
 * Host Collections - Within Red Hat Satellite, hosts can be assigned to one or more Host Collections.
 * Valid Hosts - In this context a host is valid if it has:
-    * an IP address (ipv4 or ipv6)
+    * an OS installed (that Satellite recognises)
     * a valid Red Hat subscription
     * been seen within an acceptable period of time - 7 days default (config option: sat_valid_days)
 * CIDR groups - Groups created based on the subnet the host resides in
