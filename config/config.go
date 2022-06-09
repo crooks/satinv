@@ -31,9 +31,10 @@ type Config struct {
 		Validity          int64  `yaml:"validity"`
 		InventoryValidity int64  `yaml:"inventory_validity"`
 	} `yaml:"cache"`
-	CIDRs           map[string]string `yaml:"cidrs"`
-	InventoryPrefix string            `yaml:"inventory_prefix"`
-	SatValidDays    int               `yaml:"sat_valid_days"`
+	CIDRs                map[string]string `yaml:"cidrs"`
+	InventoryPrefix      string            `yaml:"inventory_prefix"`
+	SatValidDays         int               `yaml:"sat_valid_days"`
+	SatValidExcludeHosts []string          `yaml:"sat_valid_exclude"`
 }
 
 // Flags are the command line flags
@@ -42,6 +43,16 @@ type Flags struct {
 	Debug   bool
 	List    bool
 	Refresh bool
+}
+
+// SatValidExclude returns True if a given string is a member of the excluded hosts list
+func (c *Config) SatValidExclude(s string) bool {
+	for _, sli := range c.SatValidExcludeHosts {
+		if sli == s {
+			return true
+		}
+	}
+	return false
 }
 
 // WriteConfig will create a YAML formatted config file from a Config struct

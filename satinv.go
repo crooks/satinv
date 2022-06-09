@@ -240,6 +240,11 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 
 // satValid creates an inventory group of hosts the meet "valid" conditions.
 func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
+	// Test if the host is excluded in the Config file
+	if cfg.SatValidExclude(hostNameShort) {
+		log.Printf("SatValid: Host %s is excluded", hostNameShort)
+		return
+	}
 	// Check the host has a valid Operating System installed
 	osid := host.Get("operatingsystem_id")
 	if !osid.Exists() || osid.Int() == 0 {
