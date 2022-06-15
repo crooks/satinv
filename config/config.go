@@ -31,10 +31,10 @@ type Config struct {
 		Validity          int64  `yaml:"validity"`
 		InventoryValidity int64  `yaml:"inventory_validity"`
 	} `yaml:"cache"`
-	CIDRs                map[string]string `yaml:"cidrs"`
-	InventoryPrefix      string            `yaml:"inventory_prefix"`
-	SatValidDays         int               `yaml:"sat_valid_days"`
-	SatValidExcludeHosts []string          `yaml:"sat_valid_exclude"`
+	CIDRs             map[string]string `yaml:"cidrs"`
+	InventoryPrefix   string            `yaml:"inventory_prefix"`
+	ValidDays         int               `yaml:"valid_days"`
+	ValidExcludeHosts []string          `yaml:"valid_exclude"`
 }
 
 // Flags are the command line flags
@@ -47,7 +47,7 @@ type Flags struct {
 
 // SatValidExclude returns True if a given string is a member of the excluded hosts list
 func (c *Config) SatValidExclude(s string) bool {
-	for _, sli := range c.SatValidExcludeHosts {
+	for _, sli := range c.ValidExcludeHosts {
 		if sli == s {
 			return true
 		}
@@ -106,8 +106,8 @@ func ParseConfig(filename string) (*Config, error) {
 		return nil, err
 	}
 	// Set config defaults here
-	if config.SatValidDays == 0 {
-		config.SatValidDays = defaultSatValidDays
+	if config.ValidDays == 0 {
+		config.ValidDays = defaultSatValidDays
 	}
 	if config.Cache.Validity == 0 {
 		config.Cache.Validity = defaultCacheValiditySeconds
