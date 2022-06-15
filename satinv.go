@@ -12,6 +12,7 @@ import (
 	"github.com/crooks/satinv/cacher"
 	"github.com/crooks/satinv/cidrs"
 	"github.com/crooks/satinv/config"
+	"github.com/crooks/satinv/multire"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -190,6 +191,9 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 		log.Fatal(err)
 	}
 
+	// Before we get into a hosts loop, create an instance of multiRE to test hostnames against Regular Expressions
+	validExcludeRE := multire.InitRegex(cfg.Valid.ExcludeRegex)
+
 	// Iterate through each host in the Satellite results
 	for _, h := range hosts.Get("results").Array() {
 		// Every individual host map should contain a "name" key
@@ -203,7 +207,7 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		inv.hgSatValid(h, satValidAppend, hostNameShort)
+		inv.hgSatValid(h, satValidAppend, hostNameShort, validExcludeRE)
 		if len(cidr) > 0 {
 			inv.hgCIDRMembers(h, cidr)
 		}
@@ -248,12 +252,16 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 	}
 }
 
-// satValid creates an inventory group of hosts the meet "valid" conditions.
-func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
+// satValid creates an inventory group of hosts that meet "valid" conditions.
+func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string, validExcludeRE multire.MultiRE) {
 	// Test if the host is excluded in the Config file
 	if containsStr(hostNameShort, cfg.Valid.ExcludeHosts) {
 		log.Printf("%svalid: Host %s is excluded from inventory group", cfg.InventoryPrefix, hostNameShort)
 		return
+	}
+	// Test if the host is excluded by regex matching the hostname
+	if validExcludeRE.Match(hostNameShort) {
+		log.Printf("%svalid: Host %s is excluded from inventory group by Regular Expression match", cfg.InventoryPrefix, hostNameShort)
 	}
 	// Check the host has a valid Operating System installed
 	osid := host.Get("operatingsystem_id")
