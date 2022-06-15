@@ -48,16 +48,6 @@ type Flags struct {
 	Refresh bool
 }
 
-// SatValidExclude returns True if a given string is a member of the excluded hosts list
-func (c *Config) SatValidExclude(s string) bool {
-	for _, sli := range c.Valid.ExcludeHosts {
-		if sli == s {
-			return true
-		}
-	}
-	return false
-}
-
 // WriteConfig will create a YAML formatted config file from a Config struct
 func (c *Config) WriteConfig(filename string) error {
 	data, err := yaml.Marshal(c)

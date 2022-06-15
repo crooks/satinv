@@ -57,6 +57,16 @@ func getHostByID(hosts gjson.Result, id string) (string, error) {
 	return "", err
 }
 
+// containsStr returns True if a given string is a member of a given slice
+func containsStr(str string, strs []string) bool {
+	for _, s := range strs {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
 // mkInventoryName converts a Host Collection name to something compatible with Ansible Inventories.
 func mkInventoryName(s string) string {
 	s = strings.ToLower(s)
@@ -241,8 +251,8 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 // satValid creates an inventory group of hosts the meet "valid" conditions.
 func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string) {
 	// Test if the host is excluded in the Config file
-	if cfg.SatValidExclude(hostNameShort) {
-		log.Printf("SatValid: Host %s is excluded", hostNameShort)
+	if containsStr(hostNameShort, cfg.Valid.ExcludeHosts) {
+		log.Printf("%svalid: Host %s is excluded from inventory group", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	// Check the host has a valid Operating System installed

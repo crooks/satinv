@@ -8,6 +8,16 @@ import (
 	"testing"
 )
 
+// containsStr returns True if a given string is a member of a given slice
+func containsStr(str string, strs []string) bool {
+	for _, s := range strs {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
 func TestFlags(t *testing.T) {
 	expectedConfig := "/etc/promsat/fake.yml"
 	// This needs to be set prior to doing ParseFlags()
@@ -24,10 +34,12 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("Unable to create TempFile: %v", err)
 	}
 	defer os.Remove(testFile.Name())
+	cfgValidExcludeHosts := "cfg_valid_exclude_hosts"
+	cfgValidExcludeRegex := "cfg_valid_exclude_regex"
 	fakeCfg := new(Config)
 	fakeCfg.Valid.Days = defaultSatValidDays
-	fakeCfg.Valid.ExcludeHosts = append(fakeCfg.Valid.ExcludeHosts, "svexclude")
-	fakeCfg.Valid.ExcludeRegex = append(fakeCfg.Valid.ExcludeRegex, "svregex")
+	fakeCfg.Valid.ExcludeHosts = append(fakeCfg.Valid.ExcludeHosts, cfgValidExcludeHosts)
+	fakeCfg.Valid.ExcludeRegex = append(fakeCfg.Valid.ExcludeRegex, cfgValidExcludeRegex)
 	fakeCfg.Cache.Validity = defaultCacheValiditySeconds
 	fakeCfg.Cache.InventoryValidity = defaultInventoryValiditySeconds
 	fakeCfg.InventoryPrefix = "sat_"
@@ -43,8 +55,11 @@ func TestConfig(t *testing.T) {
 			"Unexpected config.Valid.Days. Default=%d, Expected=%d, Got=%d",
 			defaultSatValidDays, fakeCfg.Valid.Days, cfg.Valid.Days)
 	}
-	if !cfg.SatValidExclude("svexclude") {
-		t.Error("SatValidExclude does not include the string svexclude")
+	if !containsStr(cfgValidExcludeHosts, cfg.Valid.ExcludeHosts) {
+		t.Errorf("cfg.Valid.ExcludeHosts does not include the string %s", cfgValidExcludeHosts)
+	}
+	if !containsStr(cfgValidExcludeRegex, cfg.Valid.ExcludeRegex) {
+		t.Errorf("cfg.Valid.ExcludeRegex does not include the string %s", cfgValidExcludeRegex)
 	}
 	if cfg.Cache.Validity != fakeCfg.Cache.Validity || cfg.Cache.Validity != defaultCacheValiditySeconds {
 		t.Fatalf(
