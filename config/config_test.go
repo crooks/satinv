@@ -27,6 +27,7 @@ func TestConfig(t *testing.T) {
 	fakeCfg := new(Config)
 	fakeCfg.Valid.Days = defaultSatValidDays
 	fakeCfg.Valid.ExcludeHosts = append(fakeCfg.Valid.ExcludeHosts, "svexclude")
+	fakeCfg.Valid.ExcludeRegex = append(fakeCfg.Valid.ExcludeRegex, "svregex")
 	fakeCfg.Cache.Validity = defaultCacheValiditySeconds
 	fakeCfg.Cache.InventoryValidity = defaultInventoryValiditySeconds
 	fakeCfg.InventoryPrefix = "sat_"
@@ -39,7 +40,7 @@ func TestConfig(t *testing.T) {
 
 	if cfg.Valid.Days != fakeCfg.Valid.Days || cfg.Valid.Days != defaultSatValidDays {
 		t.Fatalf(
-			"Unexpected config.ValidDays. Default=%d, Expected=%d, Got=%d",
+			"Unexpected config.Valid.Days. Default=%d, Expected=%d, Got=%d",
 			defaultSatValidDays, fakeCfg.Valid.Days, cfg.Valid.Days)
 	}
 	if !cfg.SatValidExclude("svexclude") {
