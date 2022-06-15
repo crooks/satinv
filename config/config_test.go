@@ -25,8 +25,8 @@ func TestConfig(t *testing.T) {
 	}
 	defer os.Remove(testFile.Name())
 	fakeCfg := new(Config)
-	fakeCfg.ValidDays = defaultSatValidDays
-	fakeCfg.ValidExcludeHosts = append(fakeCfg.ValidExcludeHosts, "svexclude")
+	fakeCfg.Valid.Days = defaultSatValidDays
+	fakeCfg.Valid.ExcludeHosts = append(fakeCfg.Valid.ExcludeHosts, "svexclude")
 	fakeCfg.Cache.Validity = defaultCacheValiditySeconds
 	fakeCfg.Cache.InventoryValidity = defaultInventoryValiditySeconds
 	fakeCfg.InventoryPrefix = "sat_"
@@ -37,10 +37,10 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("ParseConfig returned: %v", err)
 	}
 
-	if cfg.ValidDays != fakeCfg.ValidDays || cfg.ValidDays != defaultSatValidDays {
+	if cfg.Valid.Days != fakeCfg.Valid.Days || cfg.Valid.Days != defaultSatValidDays {
 		t.Fatalf(
 			"Unexpected config.ValidDays. Default=%d, Expected=%d, Got=%d",
-			defaultSatValidDays, fakeCfg.ValidDays, cfg.ValidDays)
+			defaultSatValidDays, fakeCfg.Valid.Days, cfg.Valid.Days)
 	}
 	if !cfg.SatValidExclude("svexclude") {
 		t.Error("SatValidExclude does not include the string svexclude")

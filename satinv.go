@@ -274,7 +274,7 @@ func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShor
 		log.Printf("satValid: Invalid date/time %s for %s", checkin.String(), hostNameShort)
 		return
 	}
-	oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.ValidDays))
+	oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.Valid.Days))
 	if satTime.Before(oldestValidTime) {
 		log.Printf("satValid: Last checkin for %s is too old", hostNameShort)
 		return
