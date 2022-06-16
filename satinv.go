@@ -262,6 +262,7 @@ func (inv *inventory) hgValid(host gjson.Result, validAppend, hostNameShort stri
 	// Test if the host is excluded by regex matching the hostname
 	if validExcludeRE.Match(hostNameShort) {
 		log.Printf("%svalid: Host %s is excluded from inventory group by Regular Expression match", cfg.InventoryPrefix, hostNameShort)
+		return
 	}
 	// Check the host has a valid Operating System installed
 	osid := host.Get("operatingsystem_id")
