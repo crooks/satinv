@@ -182,10 +182,10 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 		log.Print("Bypassing CIDR membership processing.  No CIDRs defined.")
 	}
 
-	// Initialize the sat_valid inventory group
-	// satValidAppend is a special string used by sjson to append entries to an inventory group
-	satValidAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
-	// Add sat_valid to the all{children} array
+	// Initialize the valid inventory group
+	// validAppend is a special string used by sjson to append entries to an inventory group
+	validAppend := fmt.Sprintf("%svalid.hosts.-1", cfg.InventoryPrefix)
+	// Add "valid" to the all{children} array
 	inv.json, err = sjson.Set(inv.json, "all.children.-1", cfg.InventoryPrefix+"valid")
 	if err != nil {
 		log.Fatal(err)
@@ -207,7 +207,7 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		inv.hgSatValid(h, satValidAppend, hostNameShort, validExcludeRE)
+		inv.hgValid(h, validAppend, hostNameShort, validExcludeRE)
 		if len(cidr) > 0 {
 			inv.hgCIDRMembers(h, cidr)
 		}
@@ -252,8 +252,8 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 	}
 }
 
-// satValid creates an inventory group of hosts that meet "valid" conditions.
-func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShort string, validExcludeRE multire.MultiRE) {
+// hgValid creates an inventory group of hosts that meet "valid" conditions.
+func (inv *inventory) hgValid(host gjson.Result, validAppend, hostNameShort string, validExcludeRE multire.MultiRE) {
 	// Test if the host is excluded in the Config file
 	if containsStr(hostNameShort, cfg.Valid.ExcludeHosts) {
 		log.Printf("%svalid: Host %s is excluded from inventory group", cfg.InventoryPrefix, hostNameShort)
@@ -266,40 +266,40 @@ func (inv *inventory) hgSatValid(host gjson.Result, satValidAppend, hostNameShor
 	// Check the host has a valid Operating System installed
 	osid := host.Get("operatingsystem_id")
 	if !osid.Exists() || osid.Int() == 0 {
-		log.Printf("satValid: No valid OS found for %s", hostNameShort)
+		log.Printf("%svalid: No valid OS found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	// Ensure the host has a valid subscription
 	subStatus := host.Get("subscription_status")
 	if !subStatus.Exists() || subStatus.Int() != 0 {
-		log.Printf("satValid: subscription_status not found for %s", hostNameShort)
+		log.Printf("%svalid: subscription_status not found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	if subStatus.Int() != 0 {
-		log.Printf("satValid: Invalid subscription status (%d) for %s", subStatus.Int(), hostNameShort)
+		log.Printf("%svalid: Invalid subscription status (%d) for %s", cfg.InventoryPrefix, subStatus.Int(), hostNameShort)
 		return
 	}
 
 	// Check last_checkin date
 	checkin := host.Get("subscription_facet_attributes.last_checkin")
 	if !checkin.Exists() {
-		log.Printf("satValid: subscription_facet_attributes.last_checkin not found for %s", hostNameShort)
+		log.Printf("%svalid: subscription_facet_attributes.last_checkin not found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	satTime, err := satTimestamp(checkin.String())
 	if err != nil {
 		// consider the host to be invalid
-		log.Printf("satValid: Invalid date/time %s for %s", checkin.String(), hostNameShort)
+		log.Printf("%svalid: Invalid date/time %s for %s", cfg.InventoryPrefix, checkin.String(), hostNameShort)
 		return
 	}
 	oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.Valid.Days))
 	if satTime.Before(oldestValidTime) {
-		log.Printf("satValid: Last checkin for %s is too old", hostNameShort)
+		log.Printf("%svalid: Last checkin for %s is too old", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 
 	// All the above conditions passed; this is a valid host.
-	inv.json, err = sjson.Set(inv.json, satValidAppend, hostNameShort)
+	inv.json, err = sjson.Set(inv.json, validAppend, hostNameShort)
 	if err != nil {
 		log.Fatal(err)
 	}
