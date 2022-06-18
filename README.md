@@ -16,7 +16,31 @@ This program will generate an [Ansible](https://ansible.com) [Dynamic Inventory]
 
 ## Configuration
 The configuration for **satinv** lives in a single YAML formatted file.  The file can be located anywhere but the default is `/etc/ansible/satinv.yml`.
-The location can be overridden with `--config=/path/to/config.yml` or by setting the environment variable `SATINVCFG`.  **Note**: You cannot use the --config option when running satinv from `ansible-playbook` or `ansible-inventory`.  This is a constraint imposed by Ansible.  A basic config file could be:
+The location can be overridden with `--config=/path/to/config.yml` or by setting the environment variable `SATINVCFG`.  **Note**: You cannot use the --config option when running satinv from `ansible-playbook` or `ansible-inventory`.  This is a constraint imposed by Ansible.
+
+### Options Overview
+#### api
+The api section is concerned with accessing the Red Hat Satellite API
+* baseurl: URL of the Red Hat Satellite instance.
+* certfile: Path to a root certificate file.  Probably only required if the above URL is self-signed.
+* user: Username that provides access to the API.  Ideally this should be a low privilege, read-only user.
+* password: password for the above user
+#### cache
+The cache sections deals with how frequently the inventory components should be refreshed
+* dir: Directory where the cache files will be stored.
+* validity: How long (in seconds) the Satellite API results in the cache are considered valid.  Default: 28800
+* inventory_validity: How long (in seconds) the dynamic inventory file is considered valid.  Default: 7200
+
+Note: **inventory_validity** should always be less than **validity**.
+#### cidrs
+The cidrs section contains a dictionary keyed by inventory_groupname and containing the CIDR of hosts that will occupy that group.
+#### valid
+The valid section contains settings relating to the special **valid** group.
+* days: A host must have reported into Satellite within this number of days to be considered valid.
+* exclude_hosts: A list of hostnames that should be excluded
+* exclude_regex: A list of Regular Expressions.  A hostname matching any of these will be excluded.
+
+### Example Configuration
 ```
 ---
 api:
@@ -34,6 +58,15 @@ cidrs:
   dev: 192.168.0.0/24
   test: 192.168.1.0/24
   prod: 192.168.100.0/23
+
+valid:
+  days: 5
+  exclude_hosts:
+    - badhostname
+    - dontansibleme
+  exclude_regex:
+    - ^test
+    - test[0-9][0-9]$
 ```
 Test the configuration by running `satinv --debug` (assuming your config path is predefined).
 
