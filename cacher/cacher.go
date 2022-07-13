@@ -36,8 +36,19 @@ type Cache struct {
 	writeExpiry  bool              // Write expiry data to disk
 }
 
+// NewCacher creates and returns a new instance of Cache.  It takes a
+// directory name where cache files will be stored and will attempt to create
+// that directory if it doesn't exist.
 func NewCacher(cacheDir string) *Cache {
 	c := new(Cache)
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		err := os.Mkdir(cacheDir, 0755)
+		if err != nil {
+			log.Fatalf("Cannot create Cache dir: %s", cacheDir)
+			panic(err)
+		}
+		log.Printf("Created cache dir: %s", cacheDir)
+	}
 	c.cacheDir = cacheDir
 	log.Printf("Cache dir set to: %s", c.cacheDir)
 	c.cacheFiles = make(map[string]string)
