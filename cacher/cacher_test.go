@@ -33,9 +33,17 @@ func abs(x int64) int64 {
 func TestCacher(t *testing.T) {
 	tempDir := mkTempDir()
 	defer os.RemoveAll(tempDir)
-	c := NewCacher(tempDir)
-	if c.cacheDir != tempDir {
-		t.Fatalf("Unexpected cacheDir.  Expected=%s, Got=%s", tempDir, c.cacheDir)
+	cacheDir := path.Join(tempDir, "cacheDir")
+	// The Cache Dir is created by the NewCacher constructor.  It shouldn't exist yet.
+	if _, err := os.Stat(cacheDir); err == nil {
+		t.Errorf("%s: Cache Dir exists before NewCacher constructor runs", cacheDir)
+	}
+	c := NewCacher(cacheDir)
+	if c.cacheDir != cacheDir {
+		t.Errorf("Unexpected cacheDir.  Expected=%s, Got=%s", tempDir, c.cacheDir)
+	}
+	if _, err := os.Stat(cacheDir); errors.Is(err, os.ErrNotExist) {
+		t.Errorf("%s: Cache Dir does not exist after constructor ran", cacheDir)
 	}
 }
 
