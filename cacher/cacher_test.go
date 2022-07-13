@@ -48,7 +48,9 @@ func TestCacher(t *testing.T) {
 }
 
 func TestExpire(t *testing.T) {
-	c := NewCacher("fake")
+	tempDir := mkTempDir()
+	defer os.RemoveAll(tempDir)
+	c := NewCacher(tempDir)
 	var durationSecs int64 = 2
 	c.SetCacheDuration(durationSecs)
 	now := time.Now().Unix()
