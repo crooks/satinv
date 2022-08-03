@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultSatValidDays             int   = 7
+	defaultSatValidHours            int   = 48
 	defaultCacheValiditySeconds     int64 = 8 * 60 * 60 // 8 Hours
 	defaultInventoryValiditySeconds int64 = 2 * 60 * 60 // 2 Hours
 )
@@ -34,7 +34,7 @@ type Config struct {
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
 	Valid           struct {
-		Days         int      `yaml:"days"`
+		Hours        int      `yaml:"hours"`
 		ExcludeHosts []string `yaml:"exclude_hosts"`
 		ExcludeRegex []string `yaml:"exclude_regex"`
 	} `yaml:"valid"`
@@ -99,8 +99,8 @@ func ParseConfig(filename string) (*Config, error) {
 		return nil, err
 	}
 	// Set config defaults here
-	if config.Valid.Days == 0 {
-		config.Valid.Days = defaultSatValidDays
+	if config.Valid.Hours == 0 {
+		config.Valid.Hours = defaultSatValidHours
 	}
 	if config.Cache.Validity == 0 {
 		config.Cache.Validity = defaultCacheValiditySeconds

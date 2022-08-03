@@ -27,8 +27,9 @@ var (
 )
 
 type inventory struct {
-	json  string
-	cache *cacher.Cache
+	json            string
+	cache           *cacher.Cache
+	oldestValidTime time.Time
 }
 
 // shortName take a hostname string and returns the shortname for it.
@@ -150,6 +151,9 @@ func mkInventory() {
 		// Force a cache refresh
 		inv.cache.SetRefresh()
 	}
+	// An age in hours beyond which hosts will be considered invalid (excluded from hgValid).
+	inv.oldestValidTime = time.Now().Add(-time.Hour * time.Duration(cfg.Valid.Hours))
+	log.Printf("Oldest valid seen age: %s", inv.oldestValidTime.String())
 
 	// This isn't a real URL; it never gets pulled from an API.  It contains the output inventory JSON and enables it
 	// to be cached.
@@ -293,8 +297,7 @@ func (inv *inventory) hgValid(host gjson.Result, validAppend, hostNameShort stri
 		log.Printf("%svalid: Invalid date/time %s for %s", cfg.InventoryPrefix, checkin.String(), hostNameShort)
 		return
 	}
-	oldestValidTime := time.Now().Add(-time.Hour * 24 * time.Duration(cfg.Valid.Days))
-	if satTime.Before(oldestValidTime) {
+	if satTime.Before(inv.oldestValidTime) {
 		log.Printf("%svalid: Last checkin for %s is too old", cfg.InventoryPrefix, hostNameShort)
 		return
 	}

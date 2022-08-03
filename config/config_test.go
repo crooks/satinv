@@ -37,7 +37,7 @@ func TestConfig(t *testing.T) {
 	cfgValidExcludeHosts := "cfg_valid_exclude_hosts"
 	cfgValidExcludeRegex := "cfg_valid_exclude_regex"
 	fakeCfg := new(Config)
-	fakeCfg.Valid.Days = defaultSatValidDays
+	fakeCfg.Valid.Hours = defaultSatValidHours
 	fakeCfg.Valid.ExcludeHosts = append(fakeCfg.Valid.ExcludeHosts, cfgValidExcludeHosts)
 	fakeCfg.Valid.ExcludeRegex = append(fakeCfg.Valid.ExcludeRegex, cfgValidExcludeRegex)
 	fakeCfg.Cache.Validity = defaultCacheValiditySeconds
@@ -50,10 +50,10 @@ func TestConfig(t *testing.T) {
 		t.Fatalf("ParseConfig returned: %v", err)
 	}
 
-	if cfg.Valid.Days != fakeCfg.Valid.Days || cfg.Valid.Days != defaultSatValidDays {
+	if cfg.Valid.Hours != fakeCfg.Valid.Hours || cfg.Valid.Hours != defaultSatValidHours {
 		t.Fatalf(
-			"Unexpected config.Valid.Days. Default=%d, Expected=%d, Got=%d",
-			defaultSatValidDays, fakeCfg.Valid.Days, cfg.Valid.Days)
+			"Unexpected config.Valid.Hours. Default=%d, Expected=%d, Got=%d",
+			defaultSatValidHours, fakeCfg.Valid.Hours, cfg.Valid.Hours)
 	}
 	if !containsStr(cfgValidExcludeHosts, cfg.Valid.ExcludeHosts) {
 		t.Errorf("cfg.Valid.ExcludeHosts does not include the string %s", cfgValidExcludeHosts)
