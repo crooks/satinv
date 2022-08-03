@@ -60,7 +60,7 @@ cidrs:
   prod: 192.168.100.0/23
 
 valid:
-  days: 5
+  hours: 48
   exclude_hosts:
     - badhostname
     - dontansibleme
