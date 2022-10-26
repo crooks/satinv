@@ -3,7 +3,6 @@ package cacher
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -15,7 +14,7 @@ import (
 )
 
 func mkTempDir() string {
-	tempDir, err := ioutil.TempDir("/tmp", "sat")
+	tempDir, err := os.MkdirTemp("/tmp", "sat")
 	if err != nil {
 		log.Fatalf("Unable to create TempDir: %v", err)
 	}

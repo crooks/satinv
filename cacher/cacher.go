@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -165,7 +164,7 @@ func (c *Cache) exportExpiry() error {
 	// Add a LF to the end of the file
 	sj += "\n"
 	fileName := path.Join(c.cacheDir, cacheExpiryFile)
-	err = ioutil.WriteFile(fileName, []byte(sj), 0644)
+	err = os.WriteFile(fileName, []byte(sj), 0644)
 	if err != nil {
 		return err
 	}
@@ -234,7 +233,7 @@ func (c *Cache) GetURL(item string) (gj gjson.Result, err error) {
 
 // GetFile reads a cache item's file from disk and returns it as a byte slice.
 func (c *Cache) GetFile(item string) []byte {
-	b, err := ioutil.ReadFile(c.cacheFiles[item])
+	b, err := os.ReadFile(c.cacheFiles[item])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -256,7 +255,7 @@ func expireTime(cacheDuration int64) int64 {
 // jsonFromFile takes the filename for a file containing json formatted content
 // and returns a gjson Result of the file content.
 func (c *Cache) jsonFromFile(filename string) (gjson.Result, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return gjson.Result{}, err
 	}
@@ -269,7 +268,7 @@ func (c *Cache) jsonToFile(filename string, gj gjson.Result) (err error) {
 	if err != nil {
 		return
 	}
-	err = ioutil.WriteFile(filename, jBytes, 0644)
+	err = os.WriteFile(filename, jBytes, 0644)
 	return
 }
 

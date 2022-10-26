@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -129,7 +129,7 @@ func (inv *inventory) refreshInventory() {
 	// For human readability, put an LF on the end of the json.
 	inv.json += "\n"
 	filename := inv.cache.GetFilename(inventoryName)
-	err = ioutil.WriteFile(filename, []byte(inv.json), 0644)
+	err = os.WriteFile(filename, []byte(inv.json), 0644)
 	if err != nil {
 		log.Fatalf("WriteFile: %v", err)
 	}
@@ -348,7 +348,7 @@ func main() {
 	flags = config.ParseFlags()
 	// For normal use, log output needs to be surpressed or inventory's dynamic inventory will try to process it.
 	if !flags.Debug {
-		log.SetOutput(ioutil.Discard)
+		log.SetOutput(io.Discard)
 	}
 	cfg, err = config.ParseConfig(flags.Config)
 	if err != nil {

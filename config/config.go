@@ -3,7 +3,6 @@ package config
 
 import (
 	"flag"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
@@ -54,7 +53,7 @@ func (c *Config) WriteConfig(filename string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(filename, data, 0644)
+	err = os.WriteFile(filename, data, 0644)
 	if err != nil {
 		return err
 	}

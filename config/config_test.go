@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path"
@@ -29,7 +28,7 @@ func TestFlags(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	testFile, err := ioutil.TempFile("/tmp", "testcfg")
+	testFile, err := os.CreateTemp("/tmp", "testcfg")
 	if err != nil {
 		t.Fatalf("Unable to create TempFile: %v", err)
 	}
