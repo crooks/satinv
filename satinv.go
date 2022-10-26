@@ -135,7 +135,7 @@ func (inv *inventory) refreshInventory() {
 	}
 	// If the inventory has been successfully refreshed, update the expiry file with a new refresh timestamp.
 	// TODO: Make the inventory cache duration configurable
-	inv.cache.UpdateExpiry(inventoryName, 3600)
+	inv.cache.UpdateExpiry(inventoryName, cfg.Cache.InventoryValidity)
 }
 
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
