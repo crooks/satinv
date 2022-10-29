@@ -134,7 +134,6 @@ func (inv *inventory) refreshInventory() {
 		log.Fatalf("WriteFile: %v", err)
 	}
 	// If the inventory has been successfully refreshed, update the expiry file with a new refresh timestamp.
-	// TODO: Make the inventory cache duration configurable
 	inv.cache.UpdateExpiry(inventoryName, cfg.Cache.InventoryValidity)
 }
 
