@@ -24,11 +24,17 @@ var (
 	errAPIInit = errors.New("API is not initialised")
 )
 
+type Item struct {
+	url    bool   // If it's not a URL, it's a file
+	expiry int64  // Epoch expiry time
+	file   string // Filename associated with the cached content
+}
+
 type Cache struct {
 	api          *satapi.AuthClient
 	apiInit      bool // Test if the API has been initialised
 	cacheDir     string
-	cacheExpiry  map[string]int64  // k=url, v=epochtime
+	content      map[string]Item   // A cache of Item structs
 	cacheFiles   map[string]string // k=url, v=cacheFile
 	cachePeriod  int64             // Seconds
 	cacheRefresh bool              // Ignore the cache and grab new URLs
@@ -51,7 +57,7 @@ func NewCacher(cacheDir string) *Cache {
 	c.cacheDir = cacheDir
 	log.Printf("Cache dir set to: %s", c.cacheDir)
 	c.cacheFiles = make(map[string]string)
-	c.cacheExpiry = make(map[string]int64)
+	c.content = make(map[string]Item)
 	// This is the only time the expire JSON is read from file.  After this, it resides in memory and only gets written
 	// to file.  If the read fails, the Cache is assumed to be empty.
 	c.importExpiry()
@@ -59,10 +65,10 @@ func NewCacher(cacheDir string) *Cache {
 }
 
 // GetFilename returns the filename for a given cache item
-func (c *Cache) GetFilename(item string) (filename string) {
+func (c *Cache) GetFilename(itemKey string) (filename string) {
 	var ok bool
-	if filename, ok = c.cacheFiles[item]; !ok {
-		log.Fatalf("No cache file associated with item \"%s\"", item)
+	if filename, ok = c.cacheFiles[itemKey]; !ok {
+		log.Fatalf("No cache file associated with item \"%s\"", itemKey)
 	}
 	return
 }
@@ -80,31 +86,24 @@ func (c *Cache) SetRefresh() {
 }
 
 // HasExpired takes a cache item and determines if it needs refreshing
-func (c *Cache) HasExpired(item string) (refresh bool, err error) {
-	var fileName string
-	var ok bool
-	var expire int64
-	// Test if the cacheFiles map contains the URL
-	if fileName, ok = c.cacheFiles[item]; !ok {
-		err = fmt.Errorf("no cache file associated with %s", item)
+func (c *Cache) HasExpired(itemKey string) (refresh bool, err error) {
+	// Test if the cache content map contains this item
+	item, ok := c.content[itemKey]
+	if !ok {
+		err = fmt.Errorf("no cache content associated with %s", itemKey)
 		return
 	}
 	if c.cacheRefresh {
 		// Instructed to force a refresh
-		log.Printf("Forced refresh of %s", item)
+		log.Printf("Forced refresh of %s", itemKey)
 		refresh = true
-	} else if _, existErr := os.Stat(fileName); os.IsNotExist(existErr) {
+	} else if _, existErr := os.Stat(item.file); os.IsNotExist(existErr) {
 		// File associated with the URL doesn't exist
-		log.Printf("Cache file %s for URL %s does not exist", fileName, item)
+		log.Printf("Cache file %s for URL %s does not exist", item.file, itemKey)
 		refresh = true
-	} else if expire, ok = c.cacheExpiry[item]; !ok {
-		// There should always be an expiry entry associated with a URL because the addURL function creates it. Despite
-		// this, we'll attempt to fetch the URL and create an expiry key for it.
-		log.Printf("No Cache expiry data for URL: %s", item)
-		refresh = true
-	} else if time.Now().Unix() > expire {
+	} else if time.Now().Unix() > item.expiry {
 		// The Cache entry has expired
-		log.Printf("Cache for %s has expired", item)
+		log.Printf("Cache for %s has expired", itemKey)
 		refresh = true
 	} else {
 		refresh = false
@@ -112,15 +111,23 @@ func (c *Cache) HasExpired(item string) (refresh bool, err error) {
 	return
 }
 
+func (c *Cache) SetExpire(itemKey string, expireEpoch int64) {
+	item, ok := c.content[itemKey]
+	if !ok {
+		log.Printf("Trying to set expire on unknown cache content: %s", itemKey)
+	}
+	item.expiry = expireEpoch
+	c.content[itemKey] = item
+}
+
 // AddURL registers a URL with a filename to contain its cached data.  If the URL has no expiry associated with it, a
 // new entry is created in the expiry cache and immediately set to expired.
-func (c *Cache) AddURL(item, fileName string) {
-	c.cacheFiles[item] = path.Join(c.cacheDir, fileName)
-	if _, ok := c.cacheExpiry[item]; !ok {
-		// Create an expiry key for the URL and expire it.
-		log.Printf("No Cache entry for %s.  Adding a new one.", item)
-		c.cacheExpiry[item] = 0
-	}
+func (c *Cache) AddURL(itemKey, fileName string) {
+	item := c.content[itemKey]
+	item.url = true
+	item.file = path.Join(c.cacheDir, fileName)
+	item.expiry = 0
+	c.content[itemKey] = item
 }
 
 // importExpiry reads the Expiry Cache File and populates the cacheExpiry map.  Entries over 7 days old are ignored.
@@ -143,7 +150,7 @@ func (c *Cache) importExpiry() {
 		epochExpiry := v.Int()
 		if epochExpiry > ageLimit {
 			log.Printf("Importing Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
-			c.cacheExpiry[k] = epochExpiry
+			c.SetExpire(k, epochExpiry)
 		} else if epochExpiry > 0 {
 			// Only log housekeeping for expiry times greater than 0
 			log.Printf("Housekeeping old Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
@@ -157,7 +164,12 @@ func (c *Cache) exportExpiry() error {
 	if err != nil {
 		return err
 	}
-	sj, err = sjson.Set(sj, "urls", c.cacheExpiry)
+	// expireMap creates a simple map of item->expireTime (epoch)
+	expireMap := make(map[string]int64)
+	for k, v := range c.content {
+		expireMap[k] = v.expiry
+	}
+	sj, err = sjson.Set(sj, "urls", expireMap)
 	if err != nil {
 		return err
 	}
@@ -173,9 +185,9 @@ func (c *Cache) exportExpiry() error {
 }
 
 // UpdateExpiry revises the expiry time of a given cache item.
-func (c *Cache) UpdateExpiry(item string, period int64) (newExpire int64) {
+func (c *Cache) UpdateExpiry(itemKey string, period int64) (newExpire int64) {
 	newExpire = expireTime(period)
-	c.cacheExpiry[item] = newExpire
+	c.SetExpire(itemKey, newExpire)
 	c.writeExpiry = true
 	return
 }
@@ -185,6 +197,7 @@ func (c *Cache) UpdateExpiry(item string, period int64) (newExpire int64) {
 func (c *Cache) WriteExpiryFile() {
 	if c.writeExpiry {
 		c.exportExpiry()
+		c.writeExpiry = false
 	}
 }
 

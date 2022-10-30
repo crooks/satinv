@@ -95,7 +95,7 @@ func TestGetURL(t *testing.T) {
 
 func TestExportExpiry(t *testing.T) {
 	tempDir := mkTempDir()
-	defer os.RemoveAll(tempDir)
+	//defer os.RemoveAll(tempDir)
 	c := NewCacher(tempDir)
 	testItem := "http://fakeurl.fake"
 	testFile := "test.json"
@@ -114,8 +114,9 @@ func TestExportExpiry(t *testing.T) {
 	emptyFile.Close()
 
 	// Test the cache item filename matches testFile
-	if c.GetFilename(testItem) != fullTestFile {
-		t.Errorf("Unexpected filename: Expected=%s, Got=%s", fullTestFile, c.GetFilename(testItem))
+	item := c.content[testItem]
+	if item.file != fullTestFile {
+		t.Errorf("Unexpected filename: Expected=%s, Got=%s", fullTestFile, item.file)
 	}
 
 	// Fetch the JSON from tempfile
@@ -146,7 +147,9 @@ func TestExportExpiry(t *testing.T) {
 		t.Error("Item cache should not be expired")
 	}
 	// Reset the item cache expiry to epoch zero (expired)
-	c.cacheExpiry[testItem] = 0
+	item = c.content[testItem]
+	item.expiry = 0
+	c.content[testItem] = item
 	expiry, err = c.HasExpired(testItem)
 	if err != nil {
 		log.Fatal(err)
