@@ -39,8 +39,9 @@ func TestConfig(t *testing.T) {
 	fakeCfg.Valid.Hours = defaultSatValidHours
 	fakeCfg.Valid.ExcludeHosts = append(fakeCfg.Valid.ExcludeHosts, cfgValidExcludeHosts)
 	fakeCfg.Valid.ExcludeRegex = append(fakeCfg.Valid.ExcludeRegex, cfgValidExcludeRegex)
-	fakeCfg.Cache.Validity = defaultCacheValiditySeconds
-	fakeCfg.Cache.InventoryValidity = defaultInventoryValiditySeconds
+	fakeCfg.Cache.ValidityHosts = defaultCacheValiditySeconds
+	fakeCfg.Cache.ValidityCollections = defaultCacheValiditySeconds
+	fakeCfg.Cache.ValidityInventory = defaultInventoryValiditySeconds
 	fakeCfg.InventoryPrefix = "sat_"
 	fakeCfg.WriteConfig(testFile.Name())
 
@@ -60,15 +61,15 @@ func TestConfig(t *testing.T) {
 	if !containsStr(cfgValidExcludeRegex, cfg.Valid.ExcludeRegex) {
 		t.Errorf("cfg.Valid.ExcludeRegex does not include the string %s", cfgValidExcludeRegex)
 	}
-	if cfg.Cache.Validity != fakeCfg.Cache.Validity || cfg.Cache.Validity != defaultCacheValiditySeconds {
+	if cfg.Cache.ValidityHosts != fakeCfg.Cache.ValidityHosts || cfg.Cache.ValidityHosts != defaultCacheValiditySeconds {
 		t.Fatalf(
 			"Unexpected config.Cache.Validity. Default=%d, Expected=%d, Got=%d",
-			defaultCacheValiditySeconds, fakeCfg.Cache.Validity, cfg.Cache.Validity)
+			defaultCacheValiditySeconds, fakeCfg.Cache.ValidityHosts, cfg.Cache.ValidityHosts)
 	}
-	if cfg.Cache.InventoryValidity != fakeCfg.Cache.InventoryValidity || cfg.Cache.InventoryValidity != defaultInventoryValiditySeconds {
+	if cfg.Cache.ValidityInventory != fakeCfg.Cache.ValidityInventory || cfg.Cache.ValidityInventory != defaultInventoryValiditySeconds {
 		t.Fatalf(
 			"Unexpected config.Cache.InventoryValidity. Default=%d, Expected=%d, Got=%d",
-			defaultInventoryValiditySeconds, fakeCfg.Cache.InventoryValidity, cfg.Cache.InventoryValidity)
+			defaultInventoryValiditySeconds, fakeCfg.Cache.ValidityInventory, cfg.Cache.ValidityInventory)
 	}
 	if cfg.InventoryPrefix != fakeCfg.InventoryPrefix {
 		t.Errorf(

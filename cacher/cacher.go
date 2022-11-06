@@ -202,10 +202,10 @@ func (c *Cache) importExpiry() {
 	}
 }
 
-// writeExpiryFile writes the cache expiry map to a file in JSON format.
-func (c *Cache) writeExpiryFile() error {
+// WriteExpiryFile writes the cache expiry map to a file in JSON format.
+func (c *Cache) WriteExpiryFile() error {
 	if !c.writeExpiry {
-		// We only need to write the expiry file if it's stale.
+		log.Print("Not writing Expiry File, nothing has changed")
 		return nil
 	}
 	sj, err := sjson.Set("", "write_time", timestamp())

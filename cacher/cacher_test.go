@@ -185,7 +185,7 @@ func TestExportExpiry(t *testing.T) {
 	if !c.writeExpiry {
 		t.Errorf("A cache item was changed but the writeExpiry flag is false")
 	}
-	c.writeExpiryFile()
+	c.WriteExpiryFile()
 
 	// Create an empty file for the cache item.  This prevents HasExpired from returning true due to the absense of
 	// the file.

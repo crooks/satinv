@@ -26,9 +26,10 @@ type Config struct {
 		User     string `yaml:"user"`
 	} `yaml:"api"`
 	Cache struct {
-		Dir               string `yaml:"dir"`
-		Validity          int64  `yaml:"validity"`
-		InventoryValidity int64  `yaml:"inventory_validity"`
+		Dir                 string `yaml:"dir"`
+		ValidityHosts       int64  `yaml:"validity_hosts"`
+		ValidityCollections int64  `yaml:"validity_collections"`
+		ValidityInventory   int64  `yaml:"validity_inventory"`
 	} `yaml:"cache"`
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
@@ -101,11 +102,14 @@ func ParseConfig(filename string) (*Config, error) {
 	if config.Valid.Hours == 0 {
 		config.Valid.Hours = defaultSatValidHours
 	}
-	if config.Cache.Validity == 0 {
-		config.Cache.Validity = defaultCacheValiditySeconds
+	if config.Cache.ValidityHosts == 0 {
+		config.Cache.ValidityHosts = defaultCacheValiditySeconds
 	}
-	if config.Cache.InventoryValidity == 0 {
-		config.Cache.InventoryValidity = defaultInventoryValiditySeconds
+	if config.Cache.ValidityCollections == 0 {
+		config.Cache.ValidityCollections = defaultCacheValiditySeconds
+	}
+	if config.Cache.ValidityInventory == 0 {
+		config.Cache.ValidityInventory = defaultInventoryValiditySeconds
 	}
 
 	// The following config options may need tilde expansion

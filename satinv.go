@@ -81,7 +81,7 @@ func mkInventoryName(s string) string {
 func (inv *inventory) getHostCollection(id string) (gjson.Result, error) {
 	collectionURL := fmt.Sprintf("%s/katello/api/host_collections/%s", cfg.API.BaseURL, id)
 	collectionFilename := fmt.Sprintf("host_collections_%s.json", id)
-	inv.cache.AddURL(collectionURL, collectionFilename)
+	inv.cache.AddURL(collectionURL, collectionFilename, cfg.Cache.ValidityCollections)
 	collection, err := inv.cache.GetURL(collectionURL)
 	if err != nil {
 		return gjson.Result{}, err
@@ -112,7 +112,7 @@ func (inv *inventory) refreshInventory() {
 
 	// Populate the hosts object
 	hostsURL := fmt.Sprintf("%s/api/v2/hosts?per_page=1000", cfg.API.BaseURL)
-	inv.cache.AddURL(hostsURL, "hosts.json")
+	inv.cache.AddURL(hostsURL, "hosts.json", cfg.Cache.ValidityHosts)
 	hosts, err := inv.cache.GetURL(hostsURL)
 	if err != nil {
 		log.Fatalf("Unable to read hosts from JSON file: %v", err)
@@ -128,13 +128,16 @@ func (inv *inventory) refreshInventory() {
 	inv.parseHostCollections(hosts)
 	// For human readability, put an LF on the end of the json.
 	inv.json += "\n"
-	filename := inv.cache.GetFilename(inventoryName)
+	filename, err := inv.cache.GetFilename(inventoryName)
+	if err != nil {
+		log.Fatalf("Unable to get cached filename: %v", err)
+	}
 	err = os.WriteFile(filename, []byte(inv.json), 0644)
 	if err != nil {
 		log.Fatalf("WriteFile: %v", err)
 	}
 	// If the inventory has been successfully refreshed, update the expiry file with a new refresh timestamp.
-	inv.cache.UpdateExpiry(inventoryName, cfg.Cache.InventoryValidity)
+	inv.cache.ResetExpire(inventoryName)
 }
 
 // mkInventory assembles all the components of a Dynamic Inventory and writes them to Stdout (or a file).
@@ -144,8 +147,6 @@ func mkInventory() {
 	// Initialize the URL cache
 	inv.cache = cacher.NewCacher(cfg.Cache.Dir)
 	// When this function completes, write the expiry file (if one or more cache items have been refreshed).
-	defer inv.cache.WriteExpiryFile()
-	inv.cache.SetCacheDuration(cfg.Cache.Validity)
 	if flags.Refresh {
 		// Force a cache refresh
 		inv.cache.SetRefresh()
@@ -154,9 +155,8 @@ func mkInventory() {
 	inv.oldestValidTime = time.Now().Add(-time.Hour * time.Duration(cfg.Valid.Hours))
 	log.Printf("Oldest valid seen age: %s", inv.oldestValidTime.String())
 
-	// This isn't a real URL; it never gets pulled from an API.  It contains the output inventory JSON and enables it
-	// to be cached.
-	inv.cache.AddURL(inventoryName, fmt.Sprintf("%s.json", inventoryName))
+	// The inventory is the output of the entire process.  We cache it to avoid having to reconstruct it from source APIs.
+	inv.cache.AddFile(inventoryName, fmt.Sprintf("%s.json", inventoryName), cfg.Cache.ValidityInventory)
 	refresh, err := inv.cache.HasExpired(inventoryName)
 	if err != nil {
 		log.Fatal(err)
@@ -164,7 +164,11 @@ func mkInventory() {
 	if refresh {
 		inv.refreshInventory()
 	} else {
-		inv.json = string(inv.cache.GetFile(inventoryName))
+		i, err := inv.cache.GetFile(inventoryName)
+		if err != nil {
+			log.Fatalf("Unable to get file: %v", err)
+		}
+		inv.json = string(i)
 	}
 	if flags.List {
 		_, err = fmt.Fprint(os.Stdout, inv.json)
@@ -172,6 +176,7 @@ func mkInventory() {
 			log.Fatalf("Fprintf: %v", err)
 		}
 	}
+	inv.cache.WriteExpiryFile()
 }
 
 // parseHosts creates the inventory hostvars metadata for each host
@@ -222,7 +227,7 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 	defer timeTrack(time.Now(), "parseHostCollections")
 	collectionsURL := fmt.Sprintf("%s/katello/api/host_collections", cfg.API.BaseURL)
-	inv.cache.AddURL(collectionsURL, "host_collections.json")
+	inv.cache.AddURL(collectionsURL, "host_collections.json", cfg.Cache.ValidityCollections)
 	collections, err := inv.cache.GetURL(collectionsURL)
 	if err != nil {
 		log.Fatalf("Unable to read JSON from file: %v", err)
