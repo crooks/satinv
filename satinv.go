@@ -21,6 +21,7 @@ import (
 
 const (
 	inventoryName string = "inventory"
+	shortDate     string = "2006-01-02 15:04:05 MST"
 )
 
 var (
@@ -155,7 +156,7 @@ func mkInventory() {
 	}
 	// An age in hours beyond which hosts will be considered invalid (excluded from hgValid).
 	inv.oldestValidTime = time.Now().Add(-time.Hour * time.Duration(cfg.Valid.Hours))
-	log.Debugf("Hosts older then %s will be deemed invalid", inv.oldestValidTime.String())
+	log.Debugf("Hosts older then %s will be deemed invalid", inv.oldestValidTime.Format(shortDate))
 
 	// The inventory is the output of the entire process.  We cache it to avoid having to reconstruct it from source APIs.
 	inv.cache.AddFile(inventoryName, fmt.Sprintf("%s.json", inventoryName), cfg.Cache.ValidityInventory)
