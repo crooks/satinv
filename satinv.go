@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/log-go"
-	"github.com/Masterminds/log-go/impl/std"
 	"github.com/crooks/jlog"
 	loglevel "github.com/crooks/log-go-level"
 	"github.com/crooks/satinv/cacher"
@@ -375,16 +374,13 @@ func main() {
 		if cfg.Logging.Filename == "" {
 			log.Fatal("Cannot log to file, no filename specified in config")
 		}
-		// This feels like a lot of work just to log to a file!
 		logWriter, err := os.OpenFile(cfg.Logging.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("Unable to open logfile: %s", err)
 		}
 		defer logWriter.Close()
-		logger := stdlog.New(logWriter, "", stdlog.Lshortfile)
-		lgr := std.New(logger)
-		lgr.Level = loglev
-		log.Current = lgr
+		stdlog.SetOutput(logWriter)
+		log.Current = log.StdLogger{Level: loglev}
 		log.Debugf("Logging to file %s has been initialised at level: %s", cfg.Logging.Filename, cfg.Logging.LevelStr)
 	}
 	// Time to do some real work
