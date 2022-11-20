@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"time"
 
+	"github.com/Masterminds/log-go"
 	"github.com/crooks/satinv/cacher/satapi"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -53,10 +53,10 @@ func NewCacher(cacheDir string) *Cache {
 			log.Fatalf("Cannot create Cache dir: %s", cacheDir)
 			panic(err)
 		}
-		log.Printf("Created cache dir: %s", cacheDir)
+		log.Debugf("Created cache dir: %s", cacheDir)
 	}
 	c.cacheDir = cacheDir
-	log.Printf("Cache dir set to: %s", c.cacheDir)
+	log.Infof("Cache dir set to: %s", c.cacheDir)
 	c.content = make(map[string]Item)
 	// This is the only time the expire JSON is read from file.  After this, it resides in memory and only gets written
 	// to file.  If the read fails, the Cache is assumed to be empty.
@@ -91,7 +91,7 @@ func (c *Cache) InitAPI(username, password, cert string) {
 // SetRefresh instructs GetURL to ignore cached files and fetch (and cache) new copies.
 func (c *Cache) SetRefresh() {
 	c.cacheRefresh = true
-	log.Print("Forcing cache refresh")
+	log.Info("Forcing cache refresh")
 }
 
 // HasExpired takes a cache item and determines if it needs refreshing
@@ -103,15 +103,15 @@ func (c *Cache) HasExpired(itemKey string) (refresh bool, err error) {
 	}
 	if c.cacheRefresh {
 		// Instructed to force a refresh
-		log.Printf("Forced refresh of %s", itemKey)
+		log.Debugf("Forced refresh of %s", itemKey)
 		refresh = true
 	} else if _, existErr := os.Stat(item.file); os.IsNotExist(existErr) {
 		// File associated with the URL doesn't exist
-		log.Printf("Cache file for URL %s does not exist", itemKey)
+		log.Infof("Cache file for URL %s does not exist", itemKey)
 		refresh = true
 	} else if time.Now().Unix() > item.expiry {
 		// The Cache entry has expired
-		log.Printf("Cache for %s has expired", itemKey)
+		log.Debugf("Cache for %s has expired", itemKey)
 		refresh = true
 	} else {
 		refresh = false
@@ -123,7 +123,7 @@ func (c *Cache) addItem(itemKey string, expireEpoch int64, isURL bool) (err erro
 	item, ok := c.content[itemKey]
 	if ok {
 		// Cache item already exists.  Why?
-		log.Printf("Warning: Cache item %s should not exist", itemKey)
+		log.Errorf("Cache item %s should not exist prior to addItem", itemKey)
 	}
 	item.expiry = expireEpoch
 	item.url = isURL
@@ -176,7 +176,7 @@ func (c *Cache) importExpiry() {
 	j, err := c.jsonFromFile(expiryFilePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			log.Printf("%s: Cache file does not exist.  Treating as empty cache", expiryFilePath)
+			log.Debugf("%s: Cache file does not exist.  Treating as empty cache", expiryFilePath)
 		} else {
 			log.Fatalf("%s: Failed to read Cache file: %v", expiryFilePath, err)
 		}
@@ -189,14 +189,14 @@ func (c *Cache) importExpiry() {
 	for k, v := range j.Get("urls").Map() {
 		epochExpiry := v.Int()
 		if epochExpiry > ageLimit {
-			log.Printf("Importing Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
+			log.Debugf("Importing Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
 			c.addItem(k, epochExpiry, true)
 		}
 	}
 	for k, v := range j.Get("files").Map() {
 		epochExpiry := v.Int()
 		if epochExpiry > ageLimit {
-			log.Printf("Importing Cache entry: url=%s, expiry=%s", k, timeEpoch(epochExpiry))
+			log.Debugf("Importing Cache entry: file=%s, expiry=%s", k, timeEpoch(epochExpiry))
 			c.addItem(k, epochExpiry, false)
 		}
 	}
@@ -205,7 +205,7 @@ func (c *Cache) importExpiry() {
 // WriteExpiryFile writes the cache expiry map to a file in JSON format.
 func (c *Cache) WriteExpiryFile() error {
 	if !c.writeExpiry {
-		log.Print("Not writing Expiry File, nothing has changed")
+		log.Debugf("Not writing Expiry File, nothing has changed")
 		return nil
 	}
 	sj, err := sjson.Set("", "write_time", timestamp())
@@ -238,7 +238,7 @@ func (c *Cache) WriteExpiryFile() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Expiry cache written to: %s", filename)
+	log.Debugf("Expiry cache written to: %s", filename)
 	c.writeExpiry = false
 	return nil
 }
@@ -249,7 +249,7 @@ func (c *Cache) getURLFromAPI(itemKey string) (gj gjson.Result, err error) {
 		err = errAPIInit
 		return
 	}
-	log.Printf("Requested retreival of: %s", itemKey)
+	log.Infof("Requested retreival of: %s", itemKey)
 	bytes, err := c.api.GetJSON(itemKey)
 	if err != nil {
 		err = fmt.Errorf("unable to parse %s: %v", itemKey, err)
