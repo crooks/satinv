@@ -33,7 +33,12 @@ type Config struct {
 	} `yaml:"cache"`
 	CIDRs           map[string]string `yaml:"cidrs"`
 	InventoryPrefix string            `yaml:"inventory_prefix"`
-	Valid           struct {
+	Logging         struct {
+		Journal  bool   `yaml:"journal"`
+		LevelStr string `yaml:"level"`
+		Filename string `yaml:"filename"`
+	} `yaml:"logging"`
+	Valid struct {
 		Hours        int      `yaml:"hours"`
 		ExcludeHosts []string `yaml:"exclude_hosts"`
 		ExcludeRegex []string `yaml:"exclude_regex"`
@@ -114,6 +119,7 @@ func ParseConfig(filename string) (*Config, error) {
 
 	// The following config options may need tilde expansion
 	config.Cache.Dir = expandTilde(config.Cache.Dir)
+	config.Logging.Filename = expandTilde(config.Logging.Filename)
 
 	return config, nil
 }

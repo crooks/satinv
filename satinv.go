@@ -3,12 +3,15 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log"
+	stdlog "log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/Masterminds/log-go"
+	"github.com/Masterminds/log-go/impl/std"
+	"github.com/crooks/jlog"
+	loglevel "github.com/crooks/log-go-level"
 	"github.com/crooks/satinv/cacher"
 	"github.com/crooks/satinv/cidrs"
 	"github.com/crooks/satinv/config"
@@ -42,7 +45,7 @@ func satTimestamp(ts string) (t time.Time, err error) {
 	layout := "2006-01-02 15:04:05 MST"
 	t, err = time.Parse(layout, ts)
 	if err != nil {
-		log.Printf("Sat time parse: %v", err)
+		log.Errorf("Sat time parse: %v", err)
 		return
 	}
 	return
@@ -153,7 +156,7 @@ func mkInventory() {
 	}
 	// An age in hours beyond which hosts will be considered invalid (excluded from hgValid).
 	inv.oldestValidTime = time.Now().Add(-time.Hour * time.Duration(cfg.Valid.Hours))
-	log.Printf("Oldest valid seen age: %s", inv.oldestValidTime.String())
+	log.Debugf("Hosts older then %s will be deemed invalid", inv.oldestValidTime.String())
 
 	// The inventory is the output of the entire process.  We cache it to avoid having to reconstruct it from source APIs.
 	inv.cache.AddFile(inventoryName, fmt.Sprintf("%s.json", inventoryName), cfg.Cache.ValidityInventory)
@@ -162,8 +165,10 @@ func mkInventory() {
 		log.Fatal(err)
 	}
 	if refresh {
+		log.Debugf("Cache of the %s file has expired.  Refreshing it.", inventoryName)
 		inv.refreshInventory()
 	} else {
+		log.Debugf("Cache of the %s file is still valid so not refreshing it.", inventoryName)
 		i, err := inv.cache.GetFile(inventoryName)
 		if err != nil {
 			log.Fatalf("Unable to get file: %v", err)
@@ -187,7 +192,7 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 	// Import the CIDRs we want to test each address against.
 	cidr := importCIDRs()
 	if len(cidr) == 0 {
-		log.Print("Bypassing CIDR membership processing.  No CIDRs defined.")
+		log.Debug("Bypassing CIDR membership processing.  No CIDRs defined.")
 	}
 
 	// Initialize the valid inventory group
@@ -206,10 +211,11 @@ func (inv *inventory) parseHosts(hosts gjson.Result) {
 	for _, h := range hosts.Get("results").Array() {
 		// Every individual host map should contain a "name" key
 		if !h.Get("name").Exists() {
-			log.Print("No hostname found in Satellite host map")
+			log.Errorf("No hostname found in Satellite host map")
 			continue
 		}
 		hostNameShort := shortName(h.Get("name").String())
+		log.Debugf("Parsing Satellite info for host: %s", hostNameShort)
 		key := fmt.Sprintf("_meta.hostvars.%s", hostNameShort)
 		inv.json, err = sjson.Set(inv.json, key, h.Value())
 		if err != nil {
@@ -235,9 +241,10 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 	for _, c := range collections.Get("results").Array() {
 		hostCollectionName := c.Get("name").String()
 		hostCollectionID := c.Get("id").String()
+		log.Debugf("Parsing Satellite Host Collection. Name=%s, ID=%s", hostCollectionName, hostCollectionID)
 		hostCollection, err := inv.getHostCollection(hostCollectionID)
 		if err != nil {
-			log.Printf("Unable to get host_collection: %v", err)
+			log.Warnf("Unable to get host_collection: %v", err)
 			continue
 		}
 		collectionKey := mkInventoryName(hostCollectionName)
@@ -249,7 +256,7 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 		for _, v := range hostCollection.Get("host_ids").Array() {
 			host, err := getHostByID(hosts, v.String())
 			if err != nil {
-				log.Printf("Cannot fetch host by ID: %v", err)
+				log.Warnf("Cannot fetch host by ID: %v", err)
 				continue
 			}
 			inv.json, err = sjson.Set(inv.json, collectionAppend, shortName(host))
@@ -264,45 +271,45 @@ func (inv *inventory) parseHostCollections(hosts gjson.Result) {
 func (inv *inventory) hgValid(host gjson.Result, validAppend, hostNameShort string, validExcludeRE multire.MultiRE) {
 	// Test if the host is excluded in the Config file
 	if containsStr(hostNameShort, cfg.Valid.ExcludeHosts) {
-		log.Printf("%svalid: Host %s is excluded from inventory group", cfg.InventoryPrefix, hostNameShort)
+		log.Infof("%svalid: Host %s is excluded from inventory group", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	// Test if the host is excluded by regex matching the hostname
 	if validExcludeRE.Match(hostNameShort) {
-		log.Printf("%svalid: Host %s is excluded from inventory group by Regular Expression match", cfg.InventoryPrefix, hostNameShort)
+		log.Infof("%svalid: Host %s is excluded from inventory group by Regular Expression match", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	// Check the host has a valid Operating System installed
 	osid := host.Get("operatingsystem_id")
 	if !osid.Exists() || osid.Int() == 0 {
-		log.Printf("%svalid: No valid OS found for %s", cfg.InventoryPrefix, hostNameShort)
+		log.Debugf("%svalid: No valid OS found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	// Ensure the host has a valid subscription
 	subStatus := host.Get("subscription_status")
-	if !subStatus.Exists() || subStatus.Int() != 0 {
-		log.Printf("%svalid: subscription_status not found for %s", cfg.InventoryPrefix, hostNameShort)
+	if !subStatus.Exists() {
+		log.Warnf("%svalid: subscription_status not found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	if subStatus.Int() != 0 {
-		log.Printf("%svalid: Invalid subscription status (%d) for %s", cfg.InventoryPrefix, subStatus.Int(), hostNameShort)
+		log.Infof("%svalid: Invalid subscription status (%d) for %s", cfg.InventoryPrefix, subStatus.Int(), hostNameShort)
 		return
 	}
 
 	// Check last_checkin date
 	checkin := host.Get("subscription_facet_attributes.last_checkin")
 	if !checkin.Exists() {
-		log.Printf("%svalid: subscription_facet_attributes.last_checkin not found for %s", cfg.InventoryPrefix, hostNameShort)
+		log.Warnf("%svalid: subscription_facet_attributes.last_checkin not found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
 	satTime, err := satTimestamp(checkin.String())
 	if err != nil {
 		// consider the host to be invalid
-		log.Printf("%svalid: Invalid date/time %s for %s", cfg.InventoryPrefix, checkin.String(), hostNameShort)
+		log.Warnf("%svalid: Cannot parse date/time string %s for host %s", cfg.InventoryPrefix, checkin.String(), hostNameShort)
 		return
 	}
 	if satTime.Before(inv.oldestValidTime) {
-		log.Printf("%svalid: Last checkin for %s is too old", cfg.InventoryPrefix, hostNameShort)
+		log.Infof("Last checkin for %s is too old. Excluding from %s_valid.", hostNameShort, cfg.InventoryPrefix)
 		return
 	}
 
@@ -336,7 +343,7 @@ func (inv *inventory) hgCIDRMembers(host gjson.Result, cidr cidrs.Cidrs) {
 		sjKey := fmt.Sprintf("%s.hosts.-1", mkInventoryName(invGrp))
 		inv.json, err = sjson.Set(inv.json, sjKey, hostNameShort)
 		if err != nil {
-			log.Printf("hgCIDRMembers: %s: %v", hostNameShort, err)
+			log.Warnf("hgCIDRMembers: %s: %v", hostNameShort, err)
 		}
 	}
 }
@@ -344,20 +351,44 @@ func (inv *inventory) hgCIDRMembers(host gjson.Result, cidr cidrs.Cidrs) {
 // timeTrack can be used to time the processing duration of a function.
 func timeTrack(start time.Time, name string) {
 	elapsed := time.Since(start)
-	log.Printf("%s took %s", name, elapsed)
+	log.Infof("%s took %s", name, elapsed)
+}
+
+// initLogging does all the stuff required to configure logging.  As log is a global variable, the function returns nothing.
+func initLogging() {
+	loglev, err := loglevel.ParseLevel(cfg.Logging.LevelStr)
+	if err != nil {
+		log.Fatalf("Unable to set log level: %v", err)
+	}
+	if cfg.Logging.Journal && jlog.Enabled() {
+		log.Current = jlog.NewJournal(loglev)
+		log.Debugf("Logging to journal has been initialised at level: %s", cfg.Logging.LevelStr)
+	} else {
+		if cfg.Logging.Filename == "" {
+			log.Fatal("Cannot log to file, no filename specified in config")
+		}
+		// This feels like a lot of work just to log to a file!
+		logWriter, err := os.OpenFile(cfg.Logging.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatalf("Unable to open logfile: %s", err)
+		}
+		defer logWriter.Close()
+		logger := stdlog.New(logWriter, "", stdlog.Lshortfile)
+		lgr := std.New(logger)
+		lgr.Level = loglev
+		log.Current = lgr
+		log.Debugf("Logging to file %s has been initialised at level: %s", cfg.Logging.Filename, cfg.Logging.LevelStr)
+	}
 }
 
 func main() {
 	var err error
 	flags = config.ParseFlags()
-	// For normal use, log output needs to be surpressed or inventory's dynamic inventory will try to process it.
-	if !flags.Debug {
-		log.SetOutput(io.Discard)
-	}
 	cfg, err = config.ParseConfig(flags.Config)
 	if err != nil {
 		log.Fatalf("Cannot parse config: %v", err)
 	}
-
+	initLogging()
+	// Time to do some real work
 	mkInventory()
 }
