@@ -115,6 +115,7 @@ func (c *Cache) HasExpired(itemKey string) (refresh bool, err error) {
 		log.Debugf("Cache for %s has expired", itemKey)
 		refresh = true
 	} else {
+		log.Debugf("Cache for %s is valid until %s", itemKey, timeEpoch(item.expiry))
 		refresh = false
 	}
 	return
@@ -139,8 +140,7 @@ func (c *Cache) ResetExpire(itemKey string) (err error) {
 		return
 	}
 	item.expiry = time.Now().Unix() + item.validity
-	expiryStamp := time.Unix(item.expiry, 0).Format(shortDate)
-	log.Debugf("Expiry for item %s extended by %d seconds to %s", itemKey, item.validity, expiryStamp)
+	log.Debugf("Expiry for item %s extended by %d seconds to %s", itemKey, item.validity, timeEpoch(item.expiry))
 	c.content[itemKey] = item
 	// Setting WriteExpire indicates the cache file needs to be rewritten (something has changed).
 	c.writeExpiry = true
@@ -354,5 +354,5 @@ func timestamp() string {
 // timeEpoch returns an ISO8601 string representation of an given epoch time.
 func timeEpoch(epoch int64) string {
 	t := time.Unix(epoch, 0)
-	return t.Format(iso8601)
+	return t.Format(shortDate)
 }
