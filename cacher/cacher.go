@@ -18,6 +18,7 @@ import (
 const (
 	cacheExpiryFile string = "expire.json"
 	iso8601         string = "2006-01-02T15:04:05Z"
+	shortDate       string = "2006-01-02 15:04:05 MST"
 )
 
 var (
@@ -138,6 +139,8 @@ func (c *Cache) ResetExpire(itemKey string) (err error) {
 		return
 	}
 	item.expiry = time.Now().Unix() + item.validity
+	expiryStamp := time.Unix(item.expiry, 0).Format(shortDate)
+	log.Debugf("Expiry for item %s extended by %d seconds to %s", itemKey, item.validity, expiryStamp)
 	c.content[itemKey] = item
 	// Setting WriteExpire indicates the cache file needs to be rewritten (something has changed).
 	c.writeExpiry = true
@@ -153,6 +156,7 @@ func (c *Cache) AddURL(itemKey, fileName string, validity int64) {
 	item.file = path.Join(c.cacheDir, fileName)
 	if !ok {
 		// If the item was imported from the expiry file, this will already be set
+		log.Debugf("Cache item %s is unknown.  Marking it as expired.", itemKey)
 		item.expiry = 0
 	}
 	c.content[itemKey] = item
@@ -267,7 +271,10 @@ func (c *Cache) getURLFromAPI(itemKey string) (gj gjson.Result, err error) {
 		return
 	}
 	// We have successfully retreived a URL so update its cache expiry time.
-	c.ResetExpire(itemKey)
+	err = c.ResetExpire(itemKey)
+	if err != nil {
+		log.Warnf("Failed to reset expiry for %s", itemKey)
+	}
 	return
 }
 
