@@ -4,7 +4,7 @@ FROM golang:1.19 as builder
 WORKDIR /workspace
 
 # Copy the go source
-COPY go.mod go.sum collector.go lastseen.go listener.go main.go .
+COPY go.mod go.sum satinv.go .
 ADD cacher ./cacher
 ADD config ./config
 ADD cidrs ./cidrs
