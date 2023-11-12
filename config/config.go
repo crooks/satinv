@@ -40,6 +40,7 @@ type Config struct {
 	} `yaml:"logging"`
 	Valid struct {
 		Hours        int      `yaml:"hours"`
+		Unlicensed   bool     `yaml:"include_unlicensed"`
 		ExcludeHosts []string `yaml:"exclude_hosts"`
 		ExcludeRegex []string `yaml:"exclude_regex"`
 	} `yaml:"valid"`

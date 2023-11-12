@@ -291,7 +291,7 @@ func (inv *inventory) hgValid(host gjson.Result, validAppend, hostNameShort stri
 		log.Warnf("%svalid: subscription_status not found for %s", cfg.InventoryPrefix, hostNameShort)
 		return
 	}
-	if subStatus.Int() != 0 {
+	if subStatus.Int() != 0 && !cfg.Valid.Unlicensed {
 		log.Infof("%svalid: Invalid subscription status (%d) for %s", cfg.InventoryPrefix, subStatus.Int(), hostNameShort)
 		return
 	}

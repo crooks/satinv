@@ -28,7 +28,7 @@ func TestFlags(t *testing.T) {
 }
 
 func TestConfig(t *testing.T) {
-	testFile, err := os.CreateTemp("/tmp", "testcfg")
+	testFile, err := os.CreateTemp("", "testcfg")
 	if err != nil {
 		t.Fatalf("Unable to create TempFile: %v", err)
 	}
@@ -60,6 +60,10 @@ func TestConfig(t *testing.T) {
 	}
 	if !containsStr(cfgValidExcludeRegex, cfg.Valid.ExcludeRegex) {
 		t.Errorf("cfg.Valid.ExcludeRegex does not include the string %s", cfgValidExcludeRegex)
+	}
+	// This isn't set in fakeCfg so it should default to False
+	if cfg.Valid.Unlicensed {
+		t.Error(("cfg.Valid.Unlicensed should be false"))
 	}
 	if cfg.Cache.ValidityHosts != fakeCfg.Cache.ValidityHosts || cfg.Cache.ValidityHosts != defaultCacheValiditySeconds {
 		t.Fatalf(
